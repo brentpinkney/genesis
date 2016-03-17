@@ -147,18 +147,18 @@ static cell * read( )
 
 static cell * eval( cell * exp, cell * env )
 {
-	return;
+	return NULL;
 }
 
 static cell * print( cell * exp )
 {
-	return;
+	return NULL;
 }
 
 static cell * interpret( )
 {
 	while( 1 ) print( eval( read( ), environment ) );
-	return;
+	return NULL;
 }
 
 static void initialize( )
@@ -197,7 +197,7 @@ static void initialize( )
 	typedef cell * (* fn_integer) (unsigned char);
 	fn_integer g = (fn_integer) (((size_t) f->header) >> 8);
 	dprintf( "g: %p\n", (void *) (size_t) *g );
-	cell * i = g( 21 );
+	g( 21 );
 }
 
 int main( )

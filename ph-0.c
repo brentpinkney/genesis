@@ -35,7 +35,7 @@ static void * read( )
 
 static void * eval( void * exp, void * env )
 {
-	return;
+	return NULL;
 }
 
 static void print( void * exp )
