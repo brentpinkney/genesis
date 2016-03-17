@@ -169,18 +169,18 @@ static cell * read( )
 
 static cell * eval( cell * exp, cell * env )
 {
-	return;
+	return NULL;
 }
 
 static cell * print( cell * exp )
 {
-	return;
+	return NULL;
 }
 
 static cell * interpret( )
 {
 	while( 1 ) print( eval( read( ), environment ) );
-	return;
+	return NULL;
 }
 
 static void initialize( )
@@ -226,7 +226,7 @@ static void initialize( )
 	fn_assq a = (fn_assq) (((size_t) h->header) >> 8);
 	printf( "a: %p\n", (void *) (size_t) *a );
 	cell * f = a( integer( 0x0a ), environment );
-	printf( "a( 0x0a, e0) : %p\n", (void *) f );
+	printf( "a(0x0a, e0) : %p\n", (void *) f );
 }
 
 int main( )
