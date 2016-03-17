@@ -103,16 +103,13 @@ static void initialize( )
 	make_symbol( 'a' );
 
 	typedef cell * (* make_integer_ptr) (unsigned char);
-	make_integer_ptr f = make_integer;
-	printf( "f: %p\n", (void *) (size_t) *f );
-	cell * i = f( 21 );
 
-	cell * g = make_function( &make_integer );
-	printf( "g: %p\n", (void *) g->header );
+	cell * f = make_function( &make_integer );
+	printf( "f: %p\n", (void *) f->header );
 
-	make_integer_ptr h = (make_integer_ptr) (((size_t) g->header) >> 8);
-	printf( "h: %p\n", (void *) (size_t) *h );
-	cell * j = f( 22 );
+	make_integer_ptr g = (make_integer_ptr) (((size_t) f->header) >> 8);
+	printf( "g: %p\n", (void *) (size_t) *g );
+	cell * i = g( 21 );
 }
 
 static void * read( )
