@@ -100,7 +100,7 @@ static cell * set_cdr( cell * i, cell * j )
 static cell * nil( )
 {
 	cell * i = allocate( 1 );
-	i->header =  TYPE_NULL;
+	i->header = TYPE_NULL;
 	dprintf( "null: %016lx\n", i->header );
 	return i;
 }
@@ -137,6 +137,18 @@ static cell * cons( cell * j, cell * k )
 	set_cdr( i, k );
 	dprintf( "%016lx (%016lx . %016lx)\n", i->header, (unsigned long) car( i ), (unsigned long) cdr( i ) );
 	return i;
+}
+
+static cell * length( cell * list )
+{
+	int len = 0;
+	cell * pair = list;
+	while( is_null( pair ) != null )
+	{
+		len++;
+		pair = cdr( pair );
+	}
+	return integer( len );
 }
 
 static cell * assq( cell * key, cell * alist )
@@ -190,12 +202,13 @@ static void initialize( )
 	null = nil( );
 
 	environment = 
-		cons( cons( integer( 0x13 ), function( initialize ) ),
-		cons( cons( integer( 0x12 ), function( interpret ) ),
-		cons( cons( integer( 0x11 ), function( print ) ),
-		cons( cons( integer( 0x10 ), function( eval ) ),
-		cons( cons( integer( 0x0f ), function( read ) ),
-		cons( cons( integer( 0x0e ), function( assq ) ),
+		cons( cons( integer( 0x14 ), function( initialize ) ),
+		cons( cons( integer( 0x13 ), function( interpret ) ),
+		cons( cons( integer( 0x12 ), function( print ) ),
+		cons( cons( integer( 0x11 ), function( eval ) ),
+		cons( cons( integer( 0x00 ), function( read ) ),
+		cons( cons( integer( 0x0f ), function( assq ) ),
+		cons( cons( integer( 0x0e ), function( length ) ),
 		cons( cons( integer( 0x0d ), function( cons ) ),
 		cons( cons( integer( 0x0c ), function( function ) ),
 		cons( cons( integer( 0x0b ), function( integer ) ),
@@ -210,7 +223,7 @@ static void initialize( )
 		cons( cons( integer( 0x02 ), function( allocate ) ),
 		cons( cons( integer( 0x01 ), function( halt ) ),
 		cons( cons( integer( 0x00 ), function( grant ) ),
-		null))))))))))))))))))));
+		null)))))))))))))))))))));
 
 	printf( "arena       : %p\n", (void *) arena );
 	printf( "null        : %p\n", (void *) null );
@@ -223,7 +236,7 @@ static void initialize( )
 	printf( "k: 0x%016lx, fn: 0x%016lx\n", (unsigned long) k->header, (unsigned long) h->header );
 
 	typedef cell * (* fn_assq) ( cell * key, cell * alist );
-	fn_assq a = (fn_assq) (((size_t) h->header) >> 8);
+	fn_assq a = (fn_assq) ( ((size_t) h->header) >> 8 );
 	printf( "a: %p\n", (void *) (size_t) *a );
 	cell * f = a( integer( 0x0a ), environment );
 	printf( "a( 0x0a, e0) : %p\n", (void *) f );
