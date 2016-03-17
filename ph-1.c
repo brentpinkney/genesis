@@ -1,5 +1,5 @@
 //
-// Pre-history 1: allocate 1 or 3 word cells, make integers, symbols, pairs, functions. make nil, invoke halt
+// Pre-history 1: allocate 1 or 3 word cells, make integers, symbols, pairs, functions. make nil, invoke 
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,13 +58,33 @@ static cell * make_symbol( unsigned char c )
 	return i;
 }
 
+static cell * car( cell * i )
+{
+	return i->car;
+}
+
+static cell * cdr( cell * i )
+{
+	return i->cdr;
+}
+
+static void set_car( cell * i, cell * j )
+{
+	i->car = (cell *) j;
+}
+
+static void set_cdr( cell * i, cell * j )
+{
+	i->cdr = (cell *) j;
+}
+
 static cell * make_pair( cell * j, cell * k )
 {
 	cell * i = allocate( 3 );
 	i->header = 0x03;
-	i->car = (cell *) j;
-	i->cdr = (cell *) j;
-	printf( "%016lx (%016lx . %016lx)\n", (unsigned long) i->header, (unsigned long) i->car, (unsigned long) i->cdr );
+	set_car( i, j );
+	set_cdr( i, k );
+	printf( "%016lx (%016lx . %016lx)\n", (unsigned long) i->header, (unsigned long) car( i ), (unsigned long) cdr( i ) );
 	return i;
 }
 
