@@ -5,21 +5,21 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
+#define PAGE_SIZE     4096
+
+int verbose = 1;
+#define dprintf( ... ) if( verbose ) printf( __VA_ARGS__ )
+
 void * arena, * environment;
 
 static void grant( )
 {
 	arena = mmap(
 		0,
-		4096 * 1,
+		PAGE_SIZE * 1,
 		PROT_READ | PROT_WRITE | PROT_EXEC,
-		MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-	printf( "arena: %p\n", arena );
-}
-
-static void initialize( )
-{
-	grant( );
+		MAP_ANONYMOUS | MAP_PRIVATE, 0, 0 );
+	dprintf( "arena: %p\n", arena );
 }
 
 static void halt( int n )
@@ -33,12 +33,12 @@ static void * read( )
 	return 0;
 }
 
-static void print( )
+static void * eval( void * exp, void * env )
 {
 	return;
 }
 
-static void * eval( void * exp, void * env )
+static void print( void * exp )
 {
 	return;
 }
@@ -47,6 +47,11 @@ static void interpret( )
 {
 	while( 1 ) print( eval( read( ), environment ) );
 	return;
+}
+
+static void initialize( )
+{
+	grant( );
 }
 
 int main( )
