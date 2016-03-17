@@ -1,5 +1,5 @@
 //
-// Pre-history 2: add is_null, is_pair, equals, assq, build environment, find prmitive via environment
+// Pre-history 2: build environment, find any prmitive via environment, assq
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -216,35 +216,6 @@ static void initialize( )
 	printf( "null        : %p\n", (void *) null );
 	printf( "environment : %p\n", (void *) environment );
 
-	cell * in = is_null( null );
-	printf( "is_null(null)        : %p\n", (void *) in );
-	cell * nn = is_null( environment );
-	printf( "is_null(environment) : %p\n", (void *) nn );
-
-	cell * np = is_pair( null );
-	printf( "is_pair(null)        : %p\n", (void *) np );
-	cell * ip = is_pair( environment );
-	printf( "is_pair(environment) : %p\n", (void *) ip );
-
-	cell * eq = equals( integer( 5 ), integer( 5 ) );
-	printf( "equals(5, 5) : %p\n", (void *) eq );
-	cell * ne = equals( integer( 5 ), integer( 4 ) );
-	printf( "equals(5, 4) : %p\n", (void *) ne );
-	cell * pe = equals( environment, environment );
-	printf( "equals(e, e)      : %p\n", (void *) pe );
-	cell * pn = equals( environment, cdr( environment ) );
-	printf( "equals(e, cdr(e)) : %p\n", (void *) pn );
-
-	// find 0x0a → symbol( c )
-	cell * f = assq( integer( 0x0a ), environment );
-	printf( "assq( 0x0a, e0) : %p\n", (void *) f );
-
-	typedef cell * (* fn_symbol) (unsigned char);
-	fn_symbol g = (fn_symbol) (((size_t) f->header) >> 8);
-	dprintf( "g: %p\n", (void *) (size_t) *g );
-	cell * i = g( 21 );
-	printf( "i: 0x%02lx, %016lx\n", i->header >> 8, i->header );
-
 	// find 0x0e → assq( k, alist ), then find 0x0a → symbol( c )
 	cell * p = car( cdr( cdr( cdr( cdr( cdr( environment ) ) ) ) ) );
 	cell * k = car( p );
@@ -254,8 +225,8 @@ static void initialize( )
 	typedef cell * (* fn_assq) ( cell * key, cell * alist );
 	fn_assq a = (fn_assq) (((size_t) h->header) >> 8);
 	printf( "a: %p\n", (void *) (size_t) *a );
-	cell * z = a( integer( 0x0a ), environment );
-	printf( "a( 0x0a, e0) : %p\n", (void *) z );
+	cell * f = a( integer( 0x0a ), environment );
+	printf( "a( 0x0a, e0) : %p\n", (void *) f );
 }
 
 int main( )
