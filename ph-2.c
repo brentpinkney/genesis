@@ -19,6 +19,7 @@
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
 #define cell_type( c ) ( c->header & MASK_TYPE )
+#define symbol_value( s ) ( ( s->header & MASK_SYMBOL ) >> 8 )
 
 struct _cell;
 typedef struct _cell cell;
@@ -162,7 +163,7 @@ cell * print_list( cell * lst, cell * env )
 		{
 			put_char( ' ', env ); put_char( '.', env ); put_char( ' ', env );
 			print( lst->cdr, env );
-			put_char( ')', env );
+			put_char( ']', env );
 			break;
 		}
 		put_char( ' ', env );
@@ -181,7 +182,7 @@ static cell * print( cell * exp, cell * env )
 			print_list( exp, env );
 			break;
 		case TYPE_SYMBOL:
-			put_char( ( exp->header & MASK_SYMBOL ) >> 8, env );
+			put_char( symbol_value( exp ), env );
 			break;
 		case TYPE_INTEGER:
 			print_integer( exp, env );
@@ -248,13 +249,47 @@ static cell * read_list( cell * lst, cell * env )
 	cell * c = read( env );
 
 	if( ( cell_type( c ) == TYPE_SYMBOL )
-	 && ( ( ( c->header & MASK_SYMBOL ) >> 8 ) == ')' ) )
+	 && ( symbol_value( c ) == '.' )
+         && ( cell_type( lst ) == TYPE_TUPLE ) )
 	{
-		return reverse( lst, env );
+		cell * d = read( env );
+		if( ( cell_type( d ) != TYPE_SYMBOL )
+		 || ( symbol_value( d ) != ')' ) )
+		{
+			cell * e = read( env );
+			if( ( cell_type( e ) == TYPE_SYMBOL )
+			 && ( symbol_value( e ) == ')' ) )
+			{
+				if( cell_type( lst->cdr ) == TYPE_NULL )
+				{
+					return cons( lst->car, cons( c, cons( d, env->car, env ), env ), env );
+				}
+				else
+				{
+					halt( env );
+				}
+			}
+			else
+			{
+				halt( env );
+			}
+		}
+		else
+		{
+			halt( env );
+		}
 	}
 	else
 	{
-		return read_list( cons( c, lst, env ), env );
+		if( ( cell_type( c ) == TYPE_SYMBOL )
+		 && ( symbol_value( c ) == ')' ) )
+		{
+			return reverse( lst, env );
+		}
+		else
+		{
+			return read_list( cons( c, lst, env ), env );
+		}
 	}
 }
 
