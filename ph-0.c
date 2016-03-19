@@ -1,5 +1,5 @@
 //
-// Pre-history 0: allocate a arena, skeletons for the REPL, halt in read
+// Pre-history 0: allocate an arena, halt
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,55 +8,32 @@
 #define PAGE_SIZE     4096
 
 int verbose = 1;
-#define dprintf( ... ) if( verbose ) printf( __VA_ARGS__ )
+#define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
 
-void * arena, * environment;
+typedef void cell;
 
-static void grant( )
+static cell * halt( cell * n )
 {
-	arena = mmap(
-		0,
-		PAGE_SIZE * 1,
-		PROT_READ | PROT_WRITE | PROT_EXEC,
-		MAP_ANONYMOUS | MAP_PRIVATE, 0, 0 );
-	dprintf( "arena: %p\n", arena );
+	dprintf( "halting…\n" );
+	exit( 1 );
+	return n;
 }
 
-static void halt( int n )
+static cell * sire( cell * ignore )
 {
-	exit( n );
-}
-
-static void * read( )
-{
-	halt( 1 );
-	return 0;
-}
-
-static void * eval( void * exp, void * env )
-{
-	return;
-}
-
-static void print( void * exp )
-{
-	return;
-}
-
-static void interpret( )
-{
-	while( 1 ) print( eval( read( ), environment ) );
-	return;
-}
-
-static void initialize( )
-{
-	grant( );
+	unsigned long size = PAGE_SIZE * 1;
+	void * arena = mmap(
+			0,
+			size,
+			PROT_READ | PROT_WRITE | PROT_EXEC,
+			MAP_ANONYMOUS | MAP_PRIVATE,
+			0, 0 );
+	dprintf( "size: %ld, arena: %p, last: %p\n", size, arena, arena + size - 1 );
+	return arena;
 }
 
 int main( )
 {
-	initialize( );
-	interpret( );
+	halt( sire( 0 ) );
 	return 0;
 }

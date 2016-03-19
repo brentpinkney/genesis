@@ -1,250 +1,335 @@
 //
-// Pre-history 2: build environment, find any prmitive via environment, assq
+// Pre-history 2: read and print
 //
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 
-#define PAGE_SIZE     4096
-#define WORD_SIZE     8
-#define TYPE_POINTER  0x00
-#define TYPE_NULL     0x01
-#define TYPE_INTEGER  0x02
-#define TYPE_SYMBOL   0x03
-#define TYPE_FUNCTION 0x04
-#define TYPE_PAIR     0x05
+#define PAGE_SIZE	4096
+#define WORD_SIZE	8
+#define MASK_TYPE	0x07
+#define MASK_SYMBOL	0xff00
+#define MASK_INTEGER_HI	0xf000
+#define MASK_INTEGER_LO	0x0f00
+#define TYPE_NULL	0x01
+#define TYPE_TUPLE	0x02
+#define TYPE_SYMBOL	0x03
+#define TYPE_INTEGER	0x04
 
-int verbose = 0;
-#define dprintf( ... ) if( verbose ) printf( __VA_ARGS__ )
+int verbose = 1;
+#define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
+#define cell_type( c ) ( c->header & MASK_TYPE )
 
 struct _cell;
 typedef struct _cell cell;
 struct _cell
 {
 	unsigned long header;
-	union { struct { cell * car, * cdr; }; };
+	union {
+		struct { unsigned long size; void * arena, * next; };
+		struct { cell * car, * cdr; }; };
 };
 
 void * arena;
-cell * next, * null, * environment;
 
-static void grant( )
+static cell * car( cell * c, cell * env ) { return c->car; }
+
+static cell * cdr( cell * c, cell * env ) { return c->cdr; }
+
+static cell * set_car( cell * c, cell * x, cell * env ) { c->car = x; return x; }
+
+static cell * set_cdr( cell * c, cell * x, cell * env ) { c->cdr = x; return x; }
+
+static cell * is_null( cell * c, cell * env )  { return ( cell_type( c ) == TYPE_NULL ) ? env : env->car; }
+
+static cell * is_tuple( cell * c, cell * env ) { return ( cell_type( c ) == TYPE_TUPLE ) ? env : env->car; }
+
+static cell * is_symbol( cell * c, cell * env )  { return ( cell_type( c ) == TYPE_SYMBOL ) ? env : env->car; }
+
+static cell * is_integer( cell * c, cell * env ) { return ( cell_type( c ) == TYPE_INTEGER ) ? env : env->car; }
+
+static cell * allocate( unsigned long words, cell * env ) // anomaly
 {
-	arena = mmap(
-		0,
-		PAGE_SIZE * 1,
-		PROT_READ | PROT_WRITE | PROT_EXEC,
-		MAP_ANONYMOUS | MAP_PRIVATE, 0, 0 );
-
-	next = (cell *) arena;
-	dprintf( "arena: %p, next: %p\n", arena, next );
-}
-
-static void halt( int n )
-{
-	exit( n );
-}
-
-static cell * allocate( int words )
-{
-	cell * this = next;
-	next = ( ( void * ) next ) + ( WORD_SIZE * words );
-	dprintf( "word: %d, cell: %p, next: %p\n", words, this, next );
+	cell * this = env->car->next;
+	env->car->next = ( (void *) env->car->next ) + ( words * WORD_SIZE );
 	return this;
 }
 
-static cell * is_null( cell * i )
+static cell * cons( cell * a, cell * b, cell * env )
 {
-	return i == null ? environment : null;
+	cell * t = allocate( 3, env );
+	t->header = TYPE_TUPLE;
+	t->car = a;
+	t->cdr = b;
+	return t;
 }
 
-static cell * is_pair( cell * i )
+static cell * symbol( unsigned char c, cell * env )
 {
-	return ( i->header & 0x07 ) == TYPE_PAIR ? i : null;
+	cell * i = allocate( 1, env );
+	i->header = ( c << 8 ) + TYPE_SYMBOL;
+	return i;
 }
 
-static cell * equals( cell * i, cell * j )
+static cell * integer( unsigned char n, cell * env )
 {
-	if( ( is_pair( i ) != null ) && ( is_pair( j ) != null ) )
+	cell * i = allocate( 1, env );
+	i->header = ( n << 8 ) + TYPE_INTEGER;
+	return i;
+}
+
+static cell * equals( cell * a, cell * b, cell * env )
+{
+	if( ( is_tuple( a, env ) != env->car ) && ( is_tuple( b, env ) != env->car ) )
 	{
-		return ( i == j ) ? i : null;
+		return ( a == b ) ? env : env->car;
 	}
 	else
 	{
-		return ( i->header == j->header ) ? i : null;
+		return ( a->header == b->header ) ? env : env->car;
 	}
 }
 
-static cell * car( cell * i )
+static cell * assq( cell * key, cell * alist, cell * env )
 {
-	return i->car;
-}
-
-static cell * cdr( cell * i )
-{
-	return i->cdr;
-}
-
-static cell * set_car( cell * i, cell * j )
-{
-	i->car = j;
-	return j;
-}
-
-static cell * set_cdr( cell * i, cell * j )
-{
-	i->cdr = j;
-	return j;
-}
-
-static cell * nil( )
-{
-	cell * i = allocate( 1 );
-	i->header = TYPE_NULL;
-	dprintf( "null: %016lx\n", i->header );
-	return i;
-}
-
-static cell * symbol( unsigned char c )
-{
-	cell * i = allocate( 1 );
-	i->header = ( c << 8 ) + TYPE_SYMBOL;
-	dprintf( "c: '%c', %016lx\n", (unsigned char) ( i->header >> 8 ), i->header );
-	return i;
-}
-
-static cell * integer( unsigned char n )
-{
-	cell * i = allocate( 1 );
-	i->header = ( n << 8 ) + TYPE_INTEGER;
-	dprintf( "n: 0x%02lx, %016lx\n", i->header >> 8, i->header );
-	return i;
-}
-
-static cell * function( void * f )
-{
-	cell * i = allocate( 1 );
-	i->header = ( (size_t) f << 8 ) + TYPE_FUNCTION;
-	dprintf( "f: %016lx\n", i->header );
-	return i;
-}
-
-static cell * cons( cell * j, cell * k )
-{
-	cell * i = allocate( 3 );
-	i->header = TYPE_PAIR;
-	set_car( i, j );
-	set_cdr( i, k );
-	dprintf( "%016lx (%016lx . %016lx)\n", i->header, (unsigned long) car( i ), (unsigned long) cdr( i ) );
-	return i;
-}
-
-static cell * length( cell * list )
-{
-	int len = 0;
-	cell * pair = list;
-	while( is_null( pair ) != null )
-	{
-		len++;
-		pair = cdr( pair );
-	}
-	return integer( len );
-}
-
-static cell * assq( cell * key, cell * alist )
-{
-	dprintf( "assq: key = %p, alist = %p\n", key, alist );
-	if( is_null( alist ) != null )
+	if( is_null( alist, env ) != env->car )
 	{
 		dprintf( "assq: not found\n" );
-		return null;
+		return env->car;
 	}
 	else
 	{
-		dprintf( "assq: caar(alist) = %p\n", car( car( alist ) ) );
-		if( equals( key, car( car( alist ) ) ) != null )
+		dprintf( "assq: caar(alist) = %016lx\n", car( car( alist, env ), env )->header );
+		equals( key, car( car( alist, env ), env ), env );
+		if( equals( key, car( car( alist, env ), env ), env ) != env->car )
 		{
-			return cdr( car( alist ) );
+			return cdr( car( alist, env ), env );
 		}
 		else
 		{
-			return assq( key, cdr( alist ) );
+			return assq( key, cdr( alist, env ), env );
 		}
 	}
 }
 
-static cell * read( )
+unsigned char put_char( unsigned char c, cell * env ) // anomaly
 {
-	halt( 1 );
-	return 0;
+	return fputc( c, stdout );
 }
 
-static cell * eval( cell * exp, cell * env )
+unsigned char get_char( cell * env ) // anomaly
 {
-	return;
+	return fgetc( stdin );
 }
 
-static cell * print( cell * exp )
+static cell * halt( cell * n )
 {
-	return;
+	printf( "halting…\n" );
+	exit( 1 );
+	return n;
 }
 
-static cell * interpret( )
+static cell * print_integer( cell * exp, cell * env )
 {
-	while( 1 ) print( eval( read( ), environment ) );
-	return;
+	unsigned long i;
+	put_char( '0', env ); put_char( 'x', env );
+	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
+	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	put_char( i, env );
+
+	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
+	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	put_char( i, env );
+
+	return env;
 }
 
-static void initialize( )
+static cell * print( cell * exp, cell * env );
+cell * print_list( cell * lst, cell * env )
 {
-	grant( );
+	put_char( '(', env );
+	while( 1 )
+	{
+		print( lst->car, env );
 
-	null = nil( );
+		if( lst->cdr == env->car )
+		{
+			put_char( ')', env );
+			break;
+		}
+		lst = lst->cdr;
+		if( is_tuple( lst, env ) == env->car )
+		{
+			put_char( ' ', env ); put_char( '.', env ); put_char( ' ', env );
+			print( lst->cdr, env );
+			put_char( ')', env );
+			break;
+		}
+		put_char( ' ', env );
+	}
+	return lst;
+}
 
-	environment = 
-		cons( cons( integer( 0x14 ), function( initialize ) ),
-		cons( cons( integer( 0x13 ), function( interpret ) ),
-		cons( cons( integer( 0x12 ), function( print ) ),
-		cons( cons( integer( 0x11 ), function( eval ) ),
-		cons( cons( integer( 0x00 ), function( read ) ),
-		cons( cons( integer( 0x0f ), function( assq ) ),
-		cons( cons( integer( 0x0e ), function( length ) ),
-		cons( cons( integer( 0x0d ), function( cons ) ),
-		cons( cons( integer( 0x0c ), function( function ) ),
-		cons( cons( integer( 0x0b ), function( integer ) ),
-		cons( cons( integer( 0x0a ), function( symbol ) ),
-		cons( cons( integer( 0x09 ), function( set_cdr ) ),
-		cons( cons( integer( 0x08 ), function( set_car ) ),
-		cons( cons( integer( 0x07 ), function( cdr ) ),
-		cons( cons( integer( 0x06 ), function( car ) ),
-		cons( cons( integer( 0x05 ), function( equals ) ),
-		cons( cons( integer( 0x04 ), function( is_pair ) ),
-		cons( cons( integer( 0x03 ), function( is_null ) ),
-		cons( cons( integer( 0x02 ), function( allocate ) ),
-		cons( cons( integer( 0x01 ), function( halt ) ),
-		cons( cons( integer( 0x00 ), function( grant ) ),
-		null)))))))))))))))))))));
+static cell * print( cell * exp, cell * env )
+{
+	switch( cell_type( exp ) )
+	{
+		case TYPE_NULL:
+			put_char( '(', env ); put_char( ')', env );
+			break;
+		case TYPE_TUPLE:
+			print_list( exp, env );
+			break;
+		case TYPE_SYMBOL:
+			put_char( ( exp->header & MASK_SYMBOL ) >> 8, env );
+			break;
+		case TYPE_INTEGER:
+			print_integer( exp, env );
+			break;
+	}
+	return env;
+}
 
-	printf( "arena       : %p\n", (void *) arena );
-	printf( "null        : %p\n", (void *) null );
-	printf( "environment : %p\n", (void *) environment );
+static cell * reverse( cell * lst, cell * env )
+{
+	cell * rev = env->car;
+	while( 1 )
+	{
+		if( lst == env->car )
+		{
+			return rev;
+		}
+		else
+		{
+			rev = cons( lst->car, rev, env );
+			lst = lst->cdr;
+		}
+	}
+}
 
-	// find 0x0e → assq( k, alist ), then find 0x0a → symbol( c )
-	cell * p = car( cdr( cdr( cdr( cdr( cdr( environment ) ) ) ) ) );
-	cell * k = car( p );
-	cell * h = cdr( p );
-	printf( "k: 0x%016lx, fn: 0x%016lx\n", (unsigned long) k->header, (unsigned long) h->header );
+static cell * read_integer( cell * env )
+{
+	unsigned char c = get_char( env );
+	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9
+	{
+		c -= 0x30;
+	}
+	else
+	{	
+		if( ( c >= 0x61 ) && ( c <= 0x66 ) ) // a - f
+		{
+			c -= 0x57;
+		}
+		else
+		{
+			halt( env );
+		}
+	}
+	c = c * 0x10;
+	unsigned char d = get_char( env );
+	if( ( d >= 0x30 ) && ( d <= 0x39 ) ) // 0 - 9
+	{
+		d -= 0x30;
+	}
+	else
+	{	
+		if( ( d >= 0x61 ) && ( d <= 0x66 ) ) // a - f
+		{
+			d -= 0x57;
+		}
+	}
+	c += d;
+	return integer( c, env );
+}
 
-	typedef cell * (* fn_assq) ( cell * key, cell * alist );
-	fn_assq a = (fn_assq) ( ((size_t) h->header) >> 8 );
-	printf( "a: %p\n", (void *) (size_t) *a );
-	cell * f = a( integer( 0x0a ), environment );
-	printf( "a( 0x0a, e0) : %p\n", (void *) f );
+static cell * read( cell * env );
+static cell * read_list( cell * lst, cell * env )
+{
+	cell * c = read( env );
+
+	if( ( cell_type( c ) == TYPE_SYMBOL )
+	 && ( ( ( c->header & MASK_SYMBOL ) >> 8 ) == ')' ) )
+	{
+		return reverse( lst, env );
+	}
+	else
+	{
+		return read_list( cons( c, lst, env ), env );
+	}
+}
+
+static cell * read( cell * env )
+{
+	unsigned char c, d;
+
+	c = get_char( env );
+	if( ( c == ' ' ) || ( c == '\t' ) )
+	{
+		return read( env );
+	}
+	if( c == '0' ) // 0x.. ?
+	{
+		d = get_char( env );
+		if( d == 'x' )
+		{
+			return read_integer( env );
+		}
+		else
+		{
+			halt( env );
+		}
+	}
+	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9 sans 0x prefix
+	{
+		halt( env );
+	}
+	if( c == '(' )
+	{
+		return read_list( env->car, env );
+	}
+	if( c == ')' )
+	{
+		return symbol( c, env );
+	}
+	if( ( c >= 0x21 ) && ( c <= 0x7e ) ) // printable
+	{
+		return symbol( c, env );;
+	}
+	
+	return halt( env );
+}
+
+static cell * sire( cell * ignore )
+{
+	unsigned long size = PAGE_SIZE * 1;
+	void * arena = mmap(
+			0,
+			size,
+			PROT_READ | PROT_WRITE | PROT_EXEC,
+			MAP_ANONYMOUS | MAP_PRIVATE,
+			0, 0 );
+
+	// no environment yet, so build null by hand…
+	cell * null  = arena;
+	null->header = TYPE_NULL;
+	null->size   = size;
+	null->arena  = arena;
+	null->next   = arena + ( 4 * WORD_SIZE );
+
+	// now build the environment…
+	cell * env  = null->next;
+	env->header = TYPE_TUPLE;
+	env->car    = null;
+	env->cdr    = null;
+	null->next  = null->next + ( 3 * WORD_SIZE );
+
+	return env;
 }
 
 int main( )
 {
-	initialize( );
-	interpret( );
+	cell * env = sire( 0 );
+	print( read( env ), env );
 	return 0;
 }
+
