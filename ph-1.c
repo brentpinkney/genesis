@@ -103,7 +103,7 @@ static cell * assq( cell * key, cell * alist, cell * env )
 		dprintf( "assq: caar(alist) = %016lx\n", car( car( alist, env ), env )->header );
 		if( equals( key, car( car( alist, env ), env ), env ) != env->car )
 		{
-			return cdr( car( alist, env ), env );
+			return car( alist, env );
 		}
 		else
 		{
@@ -183,13 +183,13 @@ static cell * sire( cell * ignore )
 	printf( "equals(e, cdr(e)) : %p\n", (void *) pn );
 
 	env->cdr = cons( cons( symbol( 'a', env ), integer( 0x0a, env ), env ), env->cdr, env );
-	env->cdr = cons( cons( symbol( 'b', env ), integer( 0x0a, env ), env ), env->cdr, env );
-	env->cdr = cons( cons( symbol( 'c', env ), integer( 0x0a, env ), env ), env->cdr, env );
+	env->cdr = cons( cons( symbol( 'b', env ), integer( 0x0b, env ), env ), env->cdr, env );
+	env->cdr = cons( cons( symbol( 'c', env ), integer( 0x0c, env ), env ), env->cdr, env );
 	printf( "definitions : %p\n", (void *) cdr( env, env ) );
 	cell * fs = assq( symbol( 'b', env ), env->cdr, env );
-	printf( "assq(b, env) : %016lx\n", fs->header );
+	printf( "assq(b, env), found  : %016lx\n", fs->header );
 	cell * nf = assq( symbol( 'd', env ), env->cdr, env );
-	printf( "assq(d, env) : %016lx\n", nf->header );
+	printf( "assq(d, env), absent : %016lx\n", nf->header );
 
 	return env;
 }

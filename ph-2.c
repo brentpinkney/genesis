@@ -101,7 +101,7 @@ static cell * assq( cell * key, cell * alist, cell * env )
 	{
 		if( equals( key, car( car( alist, env ), env ), env ) != env->car )
 		{
-			return cdr( car( alist, env ), env );
+			return car( alist, env );
 		}
 		else
 		{
@@ -190,7 +190,7 @@ cell * print_list( cell * lst, cell * env )
 		{
 			put_char( ' ', env ); put_char( '.', env ); put_char( ' ', env );
 			print( lst->cdr, env );
-			put_char( ']', env );
+			put_char( ')', env );
 			break;
 		}
 		put_char( ' ', env );
