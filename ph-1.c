@@ -5,13 +5,13 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-#define PAGE_SIZE     4096
-#define WORD_SIZE     8
-#define MASK_TYPE     0x07
-#define TYPE_NULL     0x01
-#define TYPE_TUPLE    0x02
-#define TYPE_SYMBOL   0x03
-#define TYPE_INTEGER  0x04
+#define PAGE_SIZE		4096
+#define WORD_SIZE		8
+#define MASK_TYPE		0x07
+#define CELL_NULL		0x01
+#define CELL_TUPLE		0x02
+#define CELL_SYMBOL		0x03
+#define CELL_INTEGER		0x04
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
@@ -37,13 +37,13 @@ static cell * set_car( cell * c, cell * x, cell * env ) { c->car = x; return x; 
 
 static cell * set_cdr( cell * c, cell * x, cell * env ) { c->cdr = x; return x; }
 
-static cell * is_null( cell * c, cell * env )  { return ( cell_type( c ) == TYPE_NULL ) ? env : env->car; }
+static cell * is_null( cell * c, cell * env )  { return ( cell_type( c ) == CELL_NULL ) ? env : env->car; }
 
-static cell * is_tuple( cell * c, cell * env ) { return ( cell_type( c ) == TYPE_TUPLE ) ? env : env->car; }
+static cell * is_tuple( cell * c, cell * env ) { return ( cell_type( c ) == CELL_TUPLE ) ? env : env->car; }
 
-static cell * is_symbol( cell * c, cell * env )  { return ( cell_type( c ) == TYPE_SYMBOL ) ? env : env->car; }
+static cell * is_symbol( cell * c, cell * env )  { return ( cell_type( c ) == CELL_SYMBOL ) ? env : env->car; }
 
-static cell * is_integer( cell * c, cell * env ) { return ( cell_type( c ) == TYPE_INTEGER ) ? env : env->car; }
+static cell * is_integer( cell * c, cell * env ) { return ( cell_type( c ) == CELL_INTEGER ) ? env : env->car; }
 
 static cell * allocate( unsigned long words, cell * env ) // anomaly - words is not cell *
 {
@@ -56,7 +56,7 @@ static cell * allocate( unsigned long words, cell * env ) // anomaly - words is 
 static cell * cons( cell * a, cell * b, cell * env )
 {
 	cell * t = allocate( 3, env );
-	t->header = TYPE_TUPLE;
+	t->header = CELL_TUPLE;
 	t->car = a;
 	t->cdr = b;
 	dprintf( "%016lx (%016lx . %016lx)\n", t->header, (unsigned long) car( t, env ), (unsigned long) cdr( t, env ) );
@@ -66,7 +66,7 @@ static cell * cons( cell * a, cell * b, cell * env )
 static cell * symbol( unsigned char c, cell * env )
 {
 	cell * i = allocate( 1, env );
-	i->header = ( c << 8 ) + TYPE_SYMBOL;
+	i->header = ( c << 8 ) + CELL_SYMBOL;
 	dprintf( "c: '%c', %016lx\n", (unsigned char) ( i->header >> 8 ), i->header );
 	return i;
 }
@@ -74,7 +74,7 @@ static cell * symbol( unsigned char c, cell * env )
 static cell * integer( unsigned char n, cell * env )
 {
 	cell * i = allocate( 1, env );
-	i->header = ( n << 8 ) + TYPE_INTEGER;
+	i->header = ( n << 8 ) + CELL_INTEGER;
 	dprintf( "n: 0x%02lx, %016lx\n", i->header >> 8, i->header );
 	return i;
 }
@@ -136,7 +136,7 @@ static cell * sire( cell * ignore )
 
 	// no environment yet, so build null by hand…
 	cell * null  = arena;
-	null->header = TYPE_NULL;
+	null->header = CELL_NULL;
 	null->size   = size;
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
@@ -145,7 +145,7 @@ static cell * sire( cell * ignore )
 
 	// now build the environment…
 	cell * env  = null->next;
-	env->header = TYPE_TUPLE;
+	env->header = CELL_TUPLE;
 	env->car    = null;
 	env->cdr    = null;
 	null->next  = null->next + ( 3 * WORD_SIZE );
