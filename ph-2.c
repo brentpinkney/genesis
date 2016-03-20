@@ -1,5 +1,5 @@
 //
-// Pre-history 2: read and print
+// Pre-history 2: read and print loop, no eval yet
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,13 +95,10 @@ static cell * assq( cell * key, cell * alist, cell * env )
 {
 	if( is_null( alist, env ) != env->car )
 	{
-		dprintf( "assq: not found\n" );
 		return env->car;
 	}
 	else
 	{
-		dprintf( "assq: caar(alist) = %016lx\n", car( car( alist, env ), env )->header );
-		equals( key, car( car( alist, env ), env ), env );
 		if( equals( key, car( car( alist, env ), env ), env ) != env->car )
 		{
 			return cdr( car( alist, env ), env );
@@ -123,11 +120,41 @@ unsigned char get_char( cell * env ) // anomaly
 	return fgetc( stdin );
 }
 
-static cell * halt( cell * n )
+static cell * halt( unsigned long n, cell * env )
 {
-	printf( "halting…\n" );
-	exit( 1 );
-	return n;
+	exit( n );
+	return env;
+}
+
+static cell * sire( cell * ignore )
+{
+	unsigned long size = PAGE_SIZE * 1;
+	void * arena = mmap(
+			0,
+			size,
+			PROT_READ | PROT_WRITE | PROT_EXEC,
+			MAP_ANONYMOUS | MAP_PRIVATE,
+			0, 0 );
+	if( arena == MAP_FAILED )
+	{
+		halt( 1, ignore );
+	}
+
+	// no environment yet, so build null by hand…
+	cell * null  = arena;
+	null->header = TYPE_NULL;
+	null->size   = size;
+	null->arena  = arena;
+	null->next   = arena + ( 4 * WORD_SIZE );
+
+	// now build the environment…
+	cell * env  = null->next;
+	env->header = TYPE_TUPLE;
+	env->car    = null;
+	env->cdr    = null;
+	null->next  = null->next + ( 3 * WORD_SIZE );
+
+	return env;
 }
 
 static cell * print_integer( cell * exp, cell * env )
@@ -223,7 +250,7 @@ static cell * read_integer( cell * env )
 		}
 		else
 		{
-			halt( env );
+			halt( 3, env );
 		}
 	}
 	c = c * 0x10;
@@ -266,17 +293,17 @@ static cell * read_list( cell * lst, cell * env )
 				}
 				else
 				{
-					halt( env );
+					return halt( 4, env );
 				}
 			}
 			else
 			{
-				halt( env );
+				return halt( 4, env );
 			}
 		}
 		else
 		{
-			halt( env );
+			return halt( 4, env );
 		}
 	}
 	else
@@ -298,7 +325,7 @@ static cell * read( cell * env )
 	unsigned char c, d;
 
 	c = get_char( env );
-	if( ( c == ' ' ) || ( c == '\t' ) )
+	if( ( c == ' ' ) || ( c == '\t' ) || ( c == '\n' ) )
 	{
 		return read( env );
 	}
@@ -311,12 +338,12 @@ static cell * read( cell * env )
 		}
 		else
 		{
-			halt( env );
+			return halt( 3, env );
 		}
 	}
 	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9 sans 0x prefix
 	{
-		halt( env );
+		return halt( 3, env );
 	}
 	if( c == '(' )
 	{
@@ -331,40 +358,23 @@ static cell * read( cell * env )
 		return symbol( c, env );;
 	}
 	
-	return halt( env );
+	return halt( 2, env );
 }
 
-static cell * sire( cell * ignore )
+static cell * repl( cell * env )
 {
-	unsigned long size = PAGE_SIZE * 1;
-	void * arena = mmap(
-			0,
-			size,
-			PROT_READ | PROT_WRITE | PROT_EXEC,
-			MAP_ANONYMOUS | MAP_PRIVATE,
-			0, 0 );
+	put_char( '>', env ); put_char( ' ', env );
 
-	// no environment yet, so build null by hand…
-	cell * null  = arena;
-	null->header = TYPE_NULL;
-	null->size   = size;
-	null->arena  = arena;
-	null->next   = arena + ( 4 * WORD_SIZE );
+	env = print( read( env ), env );
 
-	// now build the environment…
-	cell * env  = null->next;
-	env->header = TYPE_TUPLE;
-	env->car    = null;
-	env->cdr    = null;
-	null->next  = null->next + ( 3 * WORD_SIZE );
+	put_char( '\n', env );
 
-	return env;
+	return repl( env );
 }
 
 int main( )
 {
-	cell * env = sire( 0 );
-	print( read( env ), env );
+	repl( sire( 0 ) );
 	return 0;
 }
 
