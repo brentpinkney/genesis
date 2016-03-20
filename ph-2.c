@@ -5,30 +5,32 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-#define PAGE_SIZE	4096
-#define WORD_SIZE	8
-#define MASK_TYPE	0x07
-#define MASK_SYMBOL	0xff00
-#define MASK_INTEGER_HI	0xf000
-#define MASK_INTEGER_LO	0x0f00
-#define TYPE_NULL	0x01
-#define TYPE_TUPLE	0x02
-#define TYPE_SYMBOL	0x03
-#define TYPE_INTEGER	0x04
+#define PAGE_SIZE		4096
+#define WORD_SIZE		8
+#define MASK_TYPE		0x07
+#define CELL_NULL		0x01
+#define CELL_TUPLE		0x02
+#define CELL_SYMBOL		0x03
+#define CELL_INTEGER		0x04
+#define MASK_SYMBOL		0xff00
+#define MASK_INTEGER_HI		0xf000
+#define MASK_INTEGER_LO		0x0f00
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
-#define cell_type( c ) ( c->header & MASK_TYPE )
-#define symbol_value( s ) ( ( s->header & MASK_SYMBOL ) >> 8 )
+#define cell_type( c )    ( c->header & MASK_TYPE )
+#define symbol_value( s ) ( ( s->header & MASK_SYMBOL )  >> 8 )
 
 struct _cell;
 typedef struct _cell cell;
 struct _cell
 {
 	unsigned long header;
-	union {
+	union
+	{
 		struct { unsigned long size; void * arena, * next; };
-		struct { cell * car, * cdr; }; };
+		struct { cell * car, * cdr; };
+	};
 };
 
 void * arena;
@@ -41,13 +43,13 @@ static cell * set_car( cell * c, cell * x, cell * env ) { c->car = x; return x; 
 
 static cell * set_cdr( cell * c, cell * x, cell * env ) { c->cdr = x; return x; }
 
-static cell * is_null( cell * c, cell * env )  { return ( cell_type( c ) == TYPE_NULL ) ? env : env->car; }
+static cell * is_null( cell * c, cell * env )  { return ( cell_type( c ) == CELL_NULL ) ? env : env->car; }
 
-static cell * is_tuple( cell * c, cell * env ) { return ( cell_type( c ) == TYPE_TUPLE ) ? env : env->car; }
+static cell * is_tuple( cell * c, cell * env ) { return ( cell_type( c ) == CELL_TUPLE ) ? env : env->car; }
 
-static cell * is_symbol( cell * c, cell * env )  { return ( cell_type( c ) == TYPE_SYMBOL ) ? env : env->car; }
+static cell * is_symbol( cell * c, cell * env )  { return ( cell_type( c ) == CELL_SYMBOL ) ? env : env->car; }
 
-static cell * is_integer( cell * c, cell * env ) { return ( cell_type( c ) == TYPE_INTEGER ) ? env : env->car; }
+static cell * is_integer( cell * c, cell * env ) { return ( cell_type( c ) == CELL_INTEGER ) ? env : env->car; }
 
 static cell * allocate( unsigned long words, cell * env ) // anomaly
 {
@@ -59,7 +61,7 @@ static cell * allocate( unsigned long words, cell * env ) // anomaly
 static cell * cons( cell * a, cell * b, cell * env )
 {
 	cell * t = allocate( 3, env );
-	t->header = TYPE_TUPLE;
+	t->header = CELL_TUPLE;
 	t->car = a;
 	t->cdr = b;
 	return t;
@@ -68,14 +70,14 @@ static cell * cons( cell * a, cell * b, cell * env )
 static cell * symbol( unsigned char c, cell * env )
 {
 	cell * i = allocate( 1, env );
-	i->header = ( c << 8 ) + TYPE_SYMBOL;
+	i->header = ( c << 8 ) + CELL_SYMBOL;
 	return i;
 }
 
 static cell * integer( unsigned char n, cell * env )
 {
 	cell * i = allocate( 1, env );
-	i->header = ( n << 8 ) + TYPE_INTEGER;
+	i->header = ( n << 8 ) + CELL_INTEGER;
 	return i;
 }
 
@@ -142,14 +144,14 @@ static cell * sire( cell * ignore )
 
 	// no environment yet, so build null by hand…
 	cell * null  = arena;
-	null->header = TYPE_NULL;
+	null->header = CELL_NULL;
 	null->size   = size;
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
 
 	// now build the environment…
 	cell * env  = null->next;
-	env->header = TYPE_TUPLE;
+	env->header = CELL_TUPLE;
 	env->car    = null;
 	env->cdr    = null;
 	null->next  = null->next + ( 3 * WORD_SIZE );
@@ -202,16 +204,16 @@ static cell * print( cell * exp, cell * env )
 {
 	switch( cell_type( exp ) )
 	{
-		case TYPE_NULL:
+		case CELL_NULL:
 			put_char( '(', env ); put_char( ')', env );
 			break;
-		case TYPE_TUPLE:
+		case CELL_TUPLE:
 			print_list( exp, env );
 			break;
-		case TYPE_SYMBOL:
+		case CELL_SYMBOL:
 			put_char( symbol_value( exp ), env );
 			break;
-		case TYPE_INTEGER:
+		case CELL_INTEGER:
 			print_integer( exp, env );
 			break;
 	}
@@ -275,19 +277,19 @@ static cell * read_list( cell * lst, cell * env )
 {
 	cell * c = read( env );
 
-	if( ( cell_type( c ) == TYPE_SYMBOL )
+	if( ( cell_type( c ) == CELL_SYMBOL )
 	 && ( symbol_value( c ) == '.' )
-         && ( cell_type( lst ) == TYPE_TUPLE ) )
+         && ( cell_type( lst ) == CELL_TUPLE ) )
 	{
 		cell * d = read( env );
-		if( ( cell_type( d ) != TYPE_SYMBOL )
+		if( ( cell_type( d ) != CELL_SYMBOL )
 		 || ( symbol_value( d ) != ')' ) )
 		{
 			cell * e = read( env );
-			if( ( cell_type( e ) == TYPE_SYMBOL )
+			if( ( cell_type( e ) == CELL_SYMBOL )
 			 && ( symbol_value( e ) == ')' ) )
 			{
-				if( cell_type( lst->cdr ) == TYPE_NULL )
+				if( cell_type( lst->cdr ) == CELL_NULL )
 				{
 					return cons( lst->car, cons( c, cons( d, env->car, env ), env ), env );
 				}
@@ -308,7 +310,7 @@ static cell * read_list( cell * lst, cell * env )
 	}
 	else
 	{
-		if( ( cell_type( c ) == TYPE_SYMBOL )
+		if( ( cell_type( c ) == CELL_SYMBOL )
 		 && ( symbol_value( c ) == ')' ) )
 		{
 			return reverse( lst, env );
