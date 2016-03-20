@@ -101,7 +101,6 @@ static cell * assq( cell * key, cell * alist, cell * env )
 	else
 	{
 		dprintf( "assq: caar(alist) = %016lx\n", car( car( alist, env ), env )->header );
-		equals( key, car( car( alist, env ), env ), env );
 		if( equals( key, car( car( alist, env ), env ), env ) != env->car )
 		{
 			return cdr( car( alist, env ), env );
@@ -113,11 +112,11 @@ static cell * assq( cell * key, cell * alist, cell * env )
 	}
 }
 
-static cell * halt( cell * n )
+static cell * halt( unsigned long n, cell * env )
 {
 	dprintf( "halting…\n" );
-	exit( 1 );
-	return n;
+	exit( n );
+	return env;
 }
 
 static cell * sire( cell * ignore )
@@ -129,6 +128,10 @@ static cell * sire( cell * ignore )
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
+	if( arena == MAP_FAILED )
+	{
+		halt( 1, ignore );
+	}
 	dprintf( "size: %ld, arena: %p, last: %p\n", size, arena, arena + size - 1 );
 
 	// no environment yet, so build null by hand…
@@ -184,16 +187,16 @@ static cell * sire( cell * ignore )
 	env->cdr = cons( cons( symbol( 'c', env ), integer( 0x0a, env ), env ), env->cdr, env );
 	printf( "definitions : %p\n", (void *) cdr( env, env ) );
 	cell * fs = assq( symbol( 'b', env ), env->cdr, env );
-	printf( "assq(b, env) : %016lx\n", (void *) fs->header );
+	printf( "assq(b, env) : %016lx\n", fs->header );
 	cell * nf = assq( symbol( 'd', env ), env->cdr, env );
-	printf( "assq(d, env) : %016lx\n", (void *) nf->header );
+	printf( "assq(d, env) : %016lx\n", nf->header );
 
 	return env;
 }
 
 int main( )
 {
-	halt( sire( 0 ) );
+	halt( 0, sire( 0 ) );
 	return 0;
 }
 
