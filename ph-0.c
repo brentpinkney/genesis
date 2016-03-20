@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-#define PAGE_SIZE     4096
+#define PAGE_SIZE		4096
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
