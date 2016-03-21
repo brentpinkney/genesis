@@ -491,6 +491,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			return cons( null, null, env );
 			break;
 		case CELL_TUPLE:
+		{
 			dprintf( "eval: list\n" );
 			cell * first = exp->car;
 			dprintf( "eval: list, first = %016lx\n", first->header );
@@ -559,6 +560,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			dprintf( "eval: not special, apply…\n" );
 			return apply( null, first, exp->cdr, env );
 			break;
+		}
 		case CELL_SYMBOL:
 		{
 			dprintf( "eval: symbol\n" );
