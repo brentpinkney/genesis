@@ -6,39 +6,78 @@
 #include <sys/mman.h>
 
 #define PAGE_SIZE		4096
+#define WORD_SIZE		8
+#define CELL_NULL		0x01
+
+
+#define CELL_INTEGER		0x04
 
 int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
+#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
+#define cell_type( c ) ( c->header & MASK_TYPE )
 
-typedef void cell;
+struct _cell;
+typedef struct _cell cell;
+struct _cell
+{
+	unsigned long header;
+	union
+	{
+		struct { cell * size; void * arena, * next; };
+	};
+};
 
-static cell * halt( unsigned long n, cell * env )
+// functions…
+static void halt( unsigned long n )
 {
 	dprintf( "halting…\n" );
 	exit( n );
-	return env;
 }
 
-static cell * sire( cell * ignore )
+static cell * allocate( cell * null, unsigned long words )
 {
-	unsigned long size = PAGE_SIZE * 1;
+	cell * this = null->next;
+	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
+	dprintf( "words: %ld, cell: %p, next: %p\n", words, this, null->next );
+	return this;
+}
+
+static cell * sire( )
+{
+	unsigned long bytes = PAGE_SIZE * 1;
 	void * arena = mmap(
 			0,
-			size,
+			bytes,
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
 	if( arena == MAP_FAILED )
 	{
-		halt( 1, ignore );
+		halt( 1 );
 	}
-	dprintf( "size: %ld, arena: %p, last: %p\n", size, arena, arena + size - 1 );
 
-	return arena;
+	// build null by hand…
+	cell * null  = arena;
+	null->header = CELL_NULL;
+	null->arena  = arena;
+	null->next   = arena + ( 4 * WORD_SIZE );
+
+	// make the size integer by hand (useful as 'not null')…
+	cell * size  = allocate( null, 1 );
+	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	dprintf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
+
+	null->size = size;
+
+	dprintf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
+		null->header, null->size->header, (unsigned long) null->arena, (unsigned long) null->next );
+
+	return null;
 }
 
 int main( )
 {
-	halt( 0, sire( 0 ) );
+	cell * null = sire( );
+	halt( 0 );
 	return 0;
 }
