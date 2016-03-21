@@ -561,7 +561,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			break;
 		case CELL_SYMBOL:
 		{
-//			dprintf( "eval: symbol\n" );
+			dprintf( "eval: symbol\n" );
 			cell * tuple = assq( null, exp, env );
 			if( is_tuple( null, tuple ) != null )
 			{
