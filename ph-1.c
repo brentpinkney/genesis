@@ -7,14 +7,14 @@
 
 #define PAGE_SIZE		4096
 #define WORD_SIZE		8
-#define MASK_TYPE		0x07
 #define CELL_NULL		0x01
 #define CELL_TUPLE		0x02
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
+#define MASK_TYPE		0x07
 
 int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
+#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c ) ( c->header & MASK_TYPE )
 
 struct _cell;
@@ -22,181 +22,184 @@ typedef struct _cell cell;
 struct _cell
 {
 	unsigned long header;
-	union {
-		struct { unsigned long size; void * arena, * next; };
-		struct { cell * car, * cdr; }; };
-};
-
-void * arena;
-
-static cell * car( cell * c, cell * env ) { return c->car; }
-
-static cell * cdr( cell * c, cell * env ) { return c->cdr; }
-
-static cell * set_car( cell * c, cell * x, cell * env ) { c->car = x; return x; }
-
-static cell * set_cdr( cell * c, cell * x, cell * env ) { c->cdr = x; return x; }
-
-static cell * is_null( cell * c, cell * env )  { return ( cell_type( c ) == CELL_NULL ) ? env : env->car; }
-
-static cell * is_tuple( cell * c, cell * env ) { return ( cell_type( c ) == CELL_TUPLE ) ? env : env->car; }
-
-static cell * is_symbol( cell * c, cell * env )  { return ( cell_type( c ) == CELL_SYMBOL ) ? env : env->car; }
-
-static cell * is_integer( cell * c, cell * env ) { return ( cell_type( c ) == CELL_INTEGER ) ? env : env->car; }
-
-static cell * allocate( unsigned long words, cell * env ) // anomaly - words is not cell *
-{
-	cell * this = env->car->next;
-	env->car->next = ( (void *) env->car->next ) + ( words * WORD_SIZE );
-	dprintf( "words: %ld, cell: %p, next: %p\n", words, this, env->car->next );
-	return this;
-}
-
-static cell * cons( cell * a, cell * b, cell * env )
-{
-	cell * t = allocate( 3, env );
-	t->header = CELL_TUPLE;
-	t->car = a;
-	t->cdr = b;
-	dprintf( "%016lx (%016lx . %016lx)\n", t->header, (unsigned long) car( t, env ), (unsigned long) cdr( t, env ) );
-	return t;
-}
-
-static cell * symbol( unsigned char c, cell * env )
-{
-	cell * i = allocate( 1, env );
-	i->header = ( c << 8 ) + CELL_SYMBOL;
-	dprintf( "c: '%c', %016lx\n", (unsigned char) ( i->header >> 8 ), i->header );
-	return i;
-}
-
-static cell * integer( unsigned char n, cell * env )
-{
-	cell * i = allocate( 1, env );
-	i->header = ( n << 8 ) + CELL_INTEGER;
-	dprintf( "n: 0x%02lx, %016lx\n", i->header >> 8, i->header );
-	return i;
-}
-
-static cell * equals( cell * a, cell * b, cell * env )
-{
-	if( ( is_tuple( a, env ) != env->car ) && ( is_tuple( b, env ) != env->car ) )
+	union
 	{
-		return ( a == b ) ? env : env->car;
-	}
-	else
-	{
-		return ( a->header == b->header ) ? env : env->car;
-	}
+		struct { cell * size; void * arena, * next; };
+		struct { cell * car; cell * cdr; };
+	};
 }
+;
 
-static cell * assq( cell * key, cell * alist, cell * env )
-{
-	if( is_null( alist, env ) != env->car )
-	{
-		dprintf( "assq: not found\n" );
-		return env->car;
-	}
-	else
-	{
-		dprintf( "assq: caar(alist) = %016lx\n", car( car( alist, env ), env )->header );
-		if( equals( key, car( car( alist, env ), env ), env ) != env->car )
-		{
-			return car( alist, env );
-		}
-		else
-		{
-			return assq( key, cdr( alist, env ), env );
-		}
-	}
-}
-
-static cell * halt( unsigned long n, cell * env )
+// functions…
+static void halt( unsigned long n )
 {
 	dprintf( "halting…\n" );
 	exit( n );
-	return env;
 }
 
-static cell * sire( cell * ignore )
+static cell * allocate( cell * null, unsigned long words )
 {
-	unsigned long size = PAGE_SIZE * 1;
+	cell * this = null->next;
+	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
+	dprintf( "words: %ld, cell: %p, next: %p\n", words, this, null->next );
+	return this;
+}
+
+static cell * sire( )
+{
+	unsigned long bytes = PAGE_SIZE * 1;
 	void * arena = mmap(
 			0,
-			size,
+			bytes,
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
 	if( arena == MAP_FAILED )
 	{
-		halt( 1, ignore );
+		halt( 1 );
 	}
-	dprintf( "size: %ld, arena: %p, last: %p\n", size, arena, arena + size - 1 );
 
-	// no environment yet, so build null by hand…
+	// build null by hand…
 	cell * null  = arena;
 	null->header = CELL_NULL;
-	null->size   = size;
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
-	dprintf( "null: %016lx, size: 0x%lx, arena: %016lx, next: %016lx\n",
-		null->header, null->size, (unsigned long) null->arena, (unsigned long) null->next );
 
-	// now build the environment…
-	cell * env  = null->next;
-	env->header = CELL_TUPLE;
-	env->car    = null;
-	env->cdr    = null;
-	null->next  = null->next + ( 3 * WORD_SIZE );
-	dprintf( "null: %016lx, size: 0x%lx, arena: %016lx, next: %016lx\n",
-		null->header, null->size, (unsigned long) null->arena, (unsigned long) null->next );
+	// make the size integer by hand (useful as 'not null')…
+	cell * size  = allocate( null, 1 );
+	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	dprintf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
 
-	// tests…
-	printf( "environment : %p\n", (void *) env );
-	printf( "null        : %p\n", (void *) car( env, env ) );
-	printf( "definitions : %p\n", (void *) cdr( env, env ) );
+	null->size = size;
 
-	cell * nn = is_null( env, env );
-	printf( "is_null(env)  : %p\n", (void *) nn );
-	cell * in = is_null( null, env );
-	printf( "is_null(null) : %p\n", (void *) in );
+	dprintf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
+		null->header, null->size->header, (unsigned long) null->arena, (unsigned long) null->next );
 
-	cell * ip = is_tuple( env, env );
-	printf( "is_tuple(env)  : %p\n", (void *) ip );
-	cell * np = is_tuple( null, env );
-	printf( "is_tuple(null) : %p\n", (void *) np );
+	return null;
+}
 
-	cell * tuple = cons( symbol( 'd', env ), integer( 4, env ), env );
-	set_car( tuple, integer( 5, env ), env );
-	set_cdr( tuple, symbol( 'd', env ), env );
-	printf( "is_integer() : %p\n", (void *) is_integer( car( tuple, env ), env ) );
-	printf( "is_symbol()  : %p\n", (void *) is_symbol( cdr( tuple, env ), env ) );
+static cell * symbol( cell * null, unsigned char c )
+{
+	cell * i = allocate( null, 1 );
+	i->header = ( c << 8 ) + CELL_SYMBOL;
+	dprintf( "c: '%c', %016lx\n", (unsigned char) ( i->header >> 8 ), i->header );
+	return i;
+}
 
-	cell * eq = equals( integer( 5, env ), integer( 5, env ), env );
-	printf( "equals(5, 5) : %p\n", (void *) eq );
-	cell * ne = equals( integer( 5, env ), integer( 4, env ), env );
-	printf( "equals(5, 4) : %p\n", (void *) ne );
-	cell * pe = equals( env, env, env );
-	printf( "equals(e, e)      : %p\n", (void *) pe );
-	cell * pn = equals( env, cdr( env, env ), env );
-	printf( "equals(e, cdr(e)) : %p\n", (void *) pn );
+static cell * integer( cell * null, unsigned char n )
+{
+	cell * i = allocate( null, 1 );
+	i->header = ( n << 8 ) + CELL_INTEGER;
+	dprintf( "n: 0x%02lx, %016lx\n", i->header >> 8, i->header );
+	return i;
+}
 
-	env->cdr = cons( cons( symbol( 'a', env ), integer( 0x0a, env ), env ), env->cdr, env );
-	env->cdr = cons( cons( symbol( 'b', env ), integer( 0x0b, env ), env ), env->cdr, env );
-	env->cdr = cons( cons( symbol( 'c', env ), integer( 0x0c, env ), env ), env->cdr, env );
-	printf( "definitions : %p\n", (void *) cdr( env, env ) );
-	cell * fs = assq( symbol( 'b', env ), env->cdr, env );
-	printf( "assq(b, env), found  : %016lx\n", fs->header );
-	cell * nf = assq( symbol( 'd', env ), env->cdr, env );
-	printf( "assq(d, env), absent : %016lx\n", nf->header );
+// procedures…
+static cell * car( cell * null, cell * c ) { return c->car; }
 
-	return env;
+static cell * cdr( cell * null, cell * c ) { return c->cdr; }
+
+static cell * set_car( cell * null, cell * c, cell * x ) { c->car = x; return x; }
+
+static cell * set_cdr( cell * null, cell * c, cell * x ) { c->cdr = x; return x; }
+
+static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->size : null; }
+
+static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
+
+static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) != null ) ? null : null->size; }
+
+static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
+
+static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->size : null; }
+
+static cell * cons( cell * null, cell * a, cell * b )
+{
+	cell * t = allocate( null, 3 );
+	t->header = CELL_TUPLE;
+	t->car = a;
+	t->cdr = b;
+	dprintf( "%016lx (%016lx . %016lx)\n", t->header, (unsigned long) car( null, t ), (unsigned long) cdr( null, t ) );
+	return t;
+}
+
+static cell * equals( cell * null, cell * a, cell * b )
+{
+	if( ( is_atom( null, a ) != null ) && ( is_atom( null, b ) != null ) )
+	{
+		return ( a->header == b->header ) ? null->size : null;
+	}
+	else
+	{
+		return ( a == b ) ? null->size : null;
+	}
+}
+
+static cell * assq( cell * null, cell * key, cell * alist )
+{
+	if( is_null( null, alist ) != null )
+	{
+		dprintf( "assq: not found\n" );
+		return null;
+	}
+	else
+	{
+		dprintf( "assq: caar(alist) = %016lx\n", car( null, car( null, alist ) )->header );
+		if( equals( null, key, car( null, car( null, alist ) ) ) != null )
+		{
+			return car( null, alist );
+		}
+		else
+		{
+			return assq( null, key, cdr( null, alist ) );
+		}
+	}
 }
 
 int main( )
 {
-	halt( 0, sire( 0 ) );
+	cell * null = sire( );
+	cell * env  = null;
+
+	// tests…
+	dprintf( "null        : %p\n", (void *) null );
+	dprintf( "null->size  : %p\n", (void *) null->size );
+	dprintf( "environment : %p\n", (void *) env  );
+
+	cell * tuple = cons( null, symbol( null, 'd' ), integer( null, 4 ) );
+	set_car( null, tuple, integer( null, 5 ) );
+	set_cdr( null, tuple, symbol( null, 'd' ) );
+
+	cell * in = is_null( null, null );
+	dprintf( "is_null(null)   : %p\n", (void *) in );
+	cell * nn = is_null( null, tuple );
+	dprintf( "is_null(tuple)  : %p\n", (void *) nn );
+	cell * it = is_tuple( null, tuple );
+	dprintf( "is_tuple(tuple) : %p\n", (void *) it );
+	cell * nt = is_tuple( null, null );
+	dprintf( "is_tuple(null)  : %p\n", (void *) nt );
+
+	dprintf( "is_integers(5)  : %p\n", (void *) is_integer( null, car( null, tuple ) ) );
+	dprintf( "is_symbol(d)    : %p\n", (void *) is_symbol( null, cdr( null, tuple ) ) );
+
+	cell * eq = equals( null, integer( null, 5 ), integer( null, 5 ) );
+	dprintf( "equals(5, 5) : %p\n", (void *) eq );
+	cell * ne = equals( null, integer( null, 5 ), integer( null, 4 ) );
+	dprintf( "equals(5, 4) : %p\n", (void *) ne );
+	cell * te = equals( null, tuple, tuple );
+	dprintf( "equals(tuple, tuple) : %p\n", (void *) te );
+	cell * tn = equals( null, env, tuple );
+	dprintf( "equals(e, tuple)     : %p\n", (void *) tn );
+
+	env = cons( null, cons( null, symbol( null, 'a' ), integer( null, 0x0a ) ), env );
+	env = cons( null, cons( null, symbol( null, 'b' ), integer( null, 0x0b ) ), env );
+	env = cons( null, cons( null, symbol( null, 'c' ), integer( null, 0x0c ) ), env );
+	dprintf( "environment          : %p\n", env );
+	cell * fs = assq( null, symbol( null, 'b' ), env );
+	dprintf( "assq(b, env), found  : %016lx\n", fs->header );
+	cell * nf = assq( null, symbol( null, 'd' ), env );
+	dprintf( "assq(d, env), absent : %016lx\n", nf->header );
+
 	return 0;
 }
 

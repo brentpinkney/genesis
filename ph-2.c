@@ -7,11 +7,11 @@
 
 #define PAGE_SIZE		4096
 #define WORD_SIZE		8
-#define MASK_TYPE		0x07
 #define CELL_NULL		0x01
 #define CELL_TUPLE		0x02
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
+#define MASK_TYPE		0x07
 #define MASK_SYMBOL		0xff00
 #define MASK_INTEGER_HI		0xf000
 #define MASK_INTEGER_LO		0x0f00
@@ -28,218 +28,217 @@ struct _cell
 	unsigned long header;
 	union
 	{
-		struct { unsigned long size; void * arena, * next; };
+		struct { cell * size; void * arena, * next; };
 		struct { cell * car, * cdr; };
 	};
 };
 
-void * arena;
-
-static cell * car( cell * c, cell * env ) { return c->car; }
-
-static cell * cdr( cell * c, cell * env ) { return c->cdr; }
-
-static cell * set_car( cell * c, cell * x, cell * env ) { c->car = x; return x; }
-
-static cell * set_cdr( cell * c, cell * x, cell * env ) { c->cdr = x; return x; }
-
-static cell * is_null( cell * c, cell * env )  { return ( cell_type( c ) == CELL_NULL ) ? env : env->car; }
-
-static cell * is_tuple( cell * c, cell * env ) { return ( cell_type( c ) == CELL_TUPLE ) ? env : env->car; }
-
-static cell * is_symbol( cell * c, cell * env )  { return ( cell_type( c ) == CELL_SYMBOL ) ? env : env->car; }
-
-static cell * is_integer( cell * c, cell * env ) { return ( cell_type( c ) == CELL_INTEGER ) ? env : env->car; }
-
-static cell * allocate( unsigned long words, cell * env ) // anomaly
+// functions…
+static void halt( unsigned long n )
 {
-	cell * this = env->car->next;
-	env->car->next = ( (void *) env->car->next ) + ( words * WORD_SIZE );
+	exit( n );
+}
+
+static cell * allocate( cell * null, unsigned long words )
+{
+	cell * this = null->next;
+	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
 	return this;
 }
 
-static cell * cons( cell * a, cell * b, cell * env )
+static cell * sire( )
 {
-	cell * t = allocate( 3, env );
+	unsigned long bytes = PAGE_SIZE * 1;
+	void * arena = mmap(
+			0,
+			bytes,
+			PROT_READ | PROT_WRITE | PROT_EXEC,
+			MAP_ANONYMOUS | MAP_PRIVATE,
+			0, 0 );
+	if( arena == MAP_FAILED )
+	{
+		halt( 1 );
+	}
+
+	// build null by hand…
+	cell * null  = arena;
+	null->header = CELL_NULL;
+	null->arena  = arena;
+	null->next   = arena + ( 4 * WORD_SIZE );
+
+	// make the size integer by hand (useful as 'not null')…
+	cell * size  = allocate( null, 1 );
+	size->header = ( bytes << 8 ) + CELL_INTEGER;
+
+	null->size = size;
+
+	return null;
+}
+
+static cell * symbol( cell * null, unsigned char c )
+{
+	cell * i = allocate( null, 1 );
+	i->header = ( c << 8 ) + CELL_SYMBOL;
+	return i;
+}
+
+static cell * integer( cell * null, unsigned char n )
+{
+	cell * i = allocate( null, 1 );
+	i->header = ( n << 8 ) + CELL_INTEGER;
+	return i;
+}
+
+unsigned char put_char( unsigned char c )
+{
+	return fputc( c, stdout );
+}
+
+unsigned char get_char( )
+{
+	return fgetc( stdin );
+}
+
+// procedures…
+static cell * car( cell * null, cell * c ) { return c->car; }
+
+static cell * cdr( cell * null, cell * c ) { return c->cdr; }
+
+static cell * set_car( cell * null, cell * c, cell * x ) { c->car = x; return x; }
+
+static cell * set_cdr( cell * null, cell * c, cell * x ) { c->cdr = x; return x; }
+
+static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->size : null; }
+
+static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
+
+static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) != null ) ? null : null->size; }
+
+static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
+
+static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->size : null; }
+
+static cell * cons( cell * null, cell * a, cell * b )
+{
+	cell * t = allocate( null, 3 );
 	t->header = CELL_TUPLE;
 	t->car = a;
 	t->cdr = b;
 	return t;
 }
 
-static cell * symbol( unsigned char c, cell * env )
+static cell * equals( cell * null, cell * a, cell * b )
 {
-	cell * i = allocate( 1, env );
-	i->header = ( c << 8 ) + CELL_SYMBOL;
-	return i;
-}
-
-static cell * integer( unsigned char n, cell * env )
-{
-	cell * i = allocate( 1, env );
-	i->header = ( n << 8 ) + CELL_INTEGER;
-	return i;
-}
-
-static cell * equals( cell * a, cell * b, cell * env )
-{
-	if( ( is_tuple( a, env ) != env->car ) && ( is_tuple( b, env ) != env->car ) )
+	if( ( is_atom( null, a ) != null ) && ( is_atom( null, b ) != null ) )
 	{
-		return ( a == b ) ? env : env->car;
+		return ( a->header == b->header ) ? null->size : null;
 	}
 	else
 	{
-		return ( a->header == b->header ) ? env : env->car;
+		return ( a == b ) ? null->size : null;
 	}
 }
 
-static cell * assq( cell * key, cell * alist, cell * env )
+static cell * assq( cell * null, cell * key, cell * alist )
 {
-	if( is_null( alist, env ) != env->car )
+	if( is_null( null, alist ) != null )
 	{
-		return env->car;
+		return null;
 	}
 	else
 	{
-		if( equals( key, car( car( alist, env ), env ), env ) != env->car )
+		if( equals( null, key, car( null, car( null, alist ) ) ) != null )
 		{
-			return car( alist, env );
+			return car( null, alist );
 		}
 		else
 		{
-			return assq( key, cdr( alist, env ), env );
+			return assq( null, key, cdr( null, alist ) );
 		}
 	}
 }
 
-unsigned char put_char( unsigned char c, cell * env ) // anomaly
-{
-	return fputc( c, stdout );
-}
-
-unsigned char get_char( cell * env ) // anomaly
-{
-	return fgetc( stdin );
-}
-
-static cell * halt( unsigned long n, cell * env )
-{
-	exit( n );
-	return env;
-}
-
-static cell * sire( cell * ignore )
-{
-	unsigned long size = PAGE_SIZE * 1;
-	void * arena = mmap(
-			0,
-			size,
-			PROT_READ | PROT_WRITE | PROT_EXEC,
-			MAP_ANONYMOUS | MAP_PRIVATE,
-			0, 0 );
-	if( arena == MAP_FAILED )
-	{
-		halt( 1, ignore );
-	}
-
-	// no environment yet, so build null by hand…
-	cell * null  = arena;
-	null->header = CELL_NULL;
-	null->size   = size;
-	null->arena  = arena;
-	null->next   = arena + ( 4 * WORD_SIZE );
-
-	// now build the environment…
-	cell * env  = null->next;
-	env->header = CELL_TUPLE;
-	env->car    = null;
-	env->cdr    = null;
-	null->next  = null->next + ( 3 * WORD_SIZE );
-
-	return env;
-}
-
-static cell * print_integer( cell * exp, cell * env )
+static cell * print_integer( cell * null, cell * exp )
 {
 	unsigned long i;
-	put_char( '0', env ); put_char( 'x', env );
+	put_char( '0' ); put_char( 'x' );
 	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
 	i += ( i > 0x09 ) ? 0x57 : 0x30; 
-	put_char( i, env );
+	put_char( i );
 
 	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
 	i += ( i > 0x09 ) ? 0x57 : 0x30; 
-	put_char( i, env );
+	put_char( i );
 
-	return env;
+	return exp;
 }
 
-static cell * print( cell * exp, cell * env );
-cell * print_list( cell * lst, cell * env )
+static cell * print( cell * null, cell * exp );
+cell * print_list( cell * null, cell * lst )
 {
-	put_char( '(', env );
+	put_char( '(' );
 	while( 1 )
 	{
-		print( lst->car, env );
+		print( null, lst->car );
 
-		if( lst->cdr == env->car )
+		if( lst->cdr == null )
 		{
-			put_char( ')', env );
+			put_char( ')' );
 			break;
 		}
 		lst = lst->cdr;
-		if( is_tuple( lst, env ) == env->car )
+		if( is_tuple( null, lst ) == null )
 		{
-			put_char( ' ', env ); put_char( '.', env ); put_char( ' ', env );
-			print( lst->cdr, env );
-			put_char( ')', env );
+			put_char( ' ' ); put_char( '.' ); put_char( ' ' );
+			print( null, lst->cdr );
+			put_char( ')' );
 			break;
 		}
-		put_char( ' ', env );
+		put_char( ' ' );
 	}
 	return lst;
 }
 
-static cell * print( cell * exp, cell * env )
+static cell * print( cell * null, cell * exp )
 {
 	switch( cell_type( exp ) )
 	{
 		case CELL_NULL:
-			put_char( '(', env ); put_char( ')', env );
+			put_char( '(' ); put_char( ')' );
 			break;
 		case CELL_TUPLE:
-			print_list( exp, env );
+			print_list( null, exp );
 			break;
 		case CELL_SYMBOL:
-			put_char( symbol_value( exp ), env );
+			put_char( symbol_value( exp ) );
 			break;
 		case CELL_INTEGER:
-			print_integer( exp, env );
+			print_integer( null, exp );
 			break;
 	}
-	return env;
+	return exp;
 }
 
-static cell * reverse( cell * lst, cell * env )
+static cell * reverse( cell * null, cell * lst )
 {
-	cell * rev = env->car;
+	cell * rev = null;
 	while( 1 )
 	{
-		if( lst == env->car )
+		if( lst == null )
 		{
 			return rev;
 		}
 		else
 		{
-			rev = cons( lst->car, rev, env );
+			rev = cons( null, lst->car, rev );
 			lst = lst->cdr;
 		}
 	}
 }
 
-static cell * read_integer( cell * env )
+static cell * read_integer( cell * null )
 {
-	unsigned char c = get_char( env );
+	unsigned char c = get_char( );
 	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9
 	{
 		c -= 0x30;
@@ -252,11 +251,11 @@ static cell * read_integer( cell * env )
 		}
 		else
 		{
-			halt( 3, env );
+			halt( 3 );
 		}
 	}
 	c = c * 0x10;
-	unsigned char d = get_char( env );
+	unsigned char d = get_char( );
 	if( ( d >= 0x30 ) && ( d <= 0x39 ) ) // 0 - 9
 	{
 		d -= 0x30;
@@ -269,114 +268,104 @@ static cell * read_integer( cell * env )
 		}
 	}
 	c += d;
-	return integer( c, env );
+	return integer( null, c );
 }
 
-static cell * read( cell * env );
-static cell * read_list( cell * lst, cell * env )
+static cell * read( cell * null );
+static cell * read_list( cell * null, cell * lst )
 {
-	cell * c = read( env );
+	cell * c = read( null );
 
 	if( ( cell_type( c ) == CELL_SYMBOL )
 	 && ( symbol_value( c ) == '.' )
          && ( cell_type( lst ) == CELL_TUPLE ) )
 	{
-		cell * d = read( env );
+		cell * d = read( null );
 		if( ( cell_type( d ) != CELL_SYMBOL )
 		 || ( symbol_value( d ) != ')' ) )
 		{
-			cell * e = read( env );
+			cell * e = read( null );
 			if( ( cell_type( e ) == CELL_SYMBOL )
 			 && ( symbol_value( e ) == ')' ) )
 			{
 				if( cell_type( lst->cdr ) == CELL_NULL )
 				{
-					return cons( lst->car, cons( c, cons( d, env->car, env ), env ), env );
-				}
-				else
-				{
-					return halt( 4, env );
+					return cons( null, lst->car, cons( null, c, cons( null, d, null ) ) );
 				}
 			}
-			else
-			{
-				return halt( 4, env );
-			}
 		}
-		else
-		{
-			return halt( 4, env );
-		}
+		halt( 4 );
 	}
 	else
 	{
 		if( ( cell_type( c ) == CELL_SYMBOL )
 		 && ( symbol_value( c ) == ')' ) )
 		{
-			return reverse( lst, env );
+			return reverse( null, lst );
 		}
 		else
 		{
-			return read_list( cons( c, lst, env ), env );
+			return read_list( null, cons( null, c, lst ) );
 		}
 	}
 }
 
-static cell * read( cell * env )
+static cell * read( cell * null )
 {
 	unsigned char c, d;
 
-	c = get_char( env );
+	c = get_char( );
 	if( ( c == ' ' ) || ( c == '\t' ) || ( c == '\n' ) )
 	{
-		return read( env );
+		return read( null );
 	}
 	if( c == '0' ) // 0x.. ?
 	{
-		d = get_char( env );
+		d = get_char( );
 		if( d == 'x' )
 		{
-			return read_integer( env );
+			return read_integer( null );
 		}
 		else
 		{
-			return halt( 3, env );
+			halt( 3 );
 		}
 	}
 	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9 sans 0x prefix
 	{
-		return halt( 3, env );
+		halt( 3 );
 	}
 	if( c == '(' )
 	{
-		return read_list( env->car, env );
+		return read_list( null, null );
 	}
 	if( c == ')' )
 	{
-		return symbol( c, env );
+		return symbol( null, c );
 	}
 	if( ( c >= 0x21 ) && ( c <= 0x7e ) ) // printable
 	{
-		return symbol( c, env );;
+		return symbol( null, c );
 	}
 	
-	return halt( 2, env );
+	halt( 2 );
 }
 
-static cell * repl( cell * env )
+static cell * repl( cell * null, cell * env )
 {
-	put_char( '>', env ); put_char( ' ', env );
+	put_char( '>' ); put_char( ' ' );
+	print( null, read( null ) );
+	put_char( '\n' );
 
-	env = print( read( env ), env );
-
-	put_char( '\n', env );
-
-	return repl( env );
+	return repl( null, env );
 }
 
 int main( )
 {
-	repl( sire( 0 ) );
+	cell * null = sire( );
+	cell * env  = null;
+
+	repl( null, env );
 	return 0;
 }
 
