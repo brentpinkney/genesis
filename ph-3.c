@@ -188,6 +188,23 @@ static cell * assq( cell * null, cell * key, cell * alist )
 	}
 }
 
+static cell * reverse( cell * null, cell * lst )
+{
+	cell * rev = null;
+	while( 1 )
+	{
+		if( lst == null )
+		{
+			return rev;
+		}
+		else
+		{
+			rev = cons( null, lst->car, rev );
+			lst = lst->cdr;
+		}
+	}
+}
+
 static cell * print_integer( cell * null, cell * exp )
 {
 	unsigned long i;
@@ -260,23 +277,6 @@ static cell * print( cell * null, cell * exp )
 			break;
 	}
 	return exp;
-}
-
-static cell * reverse( cell * null, cell * lst )
-{
-	cell * rev = null;
-	while( 1 )
-	{
-		if( lst == null )
-		{
-			return rev;
-		}
-		else
-		{
-			rev = cons( null, lst->car, rev );
-			lst = lst->cdr;
-		}
-	}
 }
 
 static cell * read_integer( cell * null )
