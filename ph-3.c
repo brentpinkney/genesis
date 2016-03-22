@@ -40,7 +40,7 @@ struct _cell
 		struct { cell * size; void * arena, * next; };
 		struct { cell * car, * cdr; };
 		struct { cell * operation; };
-		struct { cell * bytes; };
+		struct { void * bytes; };
 	};
 };
 
@@ -100,6 +100,9 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
+static cell * function( cell * null, cell * exp ) { halt( 9 ); return null; }
+static cell * procedure( cell * null, cell * exp ) { halt( 9 ); return null; }
+
 unsigned char put_char( unsigned char c )
 {
 	return fputc( c, stdout );
@@ -137,9 +140,6 @@ static cell * cons( cell * null, cell * a, cell * b )
 	t->cdr = b;
 	return t;
 }
-
-static cell * function( cell * null, cell * exp ) { halt( 9 ); return null; }
-static cell * procedure( cell * null, cell * exp ) { halt( 9 ); return null; }
 
 static cell * lambda( cell * null, cell * exp )
 {
