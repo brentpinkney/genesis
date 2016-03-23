@@ -100,13 +100,13 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
-static cell * function( cell * null, cell * exp ) { halt( 9 ); return null; }
+// static cell * function( cell * null, cell * exp ) { halt( 99 ); return null; }
 
 static cell * procedure( cell * null, unsigned long nargs, void * bytes )
 {
 	cell * p = allocate( null, 2 );
 	p->header = ( nargs << 8 ) + CELL_PROCEDURE;	
-	p->bytes = bytes;
+	p->bytes  = bytes;
 	return p;
 }
 
@@ -121,6 +121,8 @@ unsigned char get_char( )
 }
 
 // procedures…
+static cell * quit( cell * null, cell * n ) { halt( integer_value( n ) ); return n; }
+
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
@@ -217,11 +219,11 @@ static cell * print_integer( cell * null, cell * exp )
 	unsigned long i;
 	put_char( '0' ); put_char( 'x' );
 	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
-	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0'; 
 	put_char( i );
 
 	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
-	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0'; 
 	put_char( i );
 
 	return exp;
@@ -230,25 +232,66 @@ static cell * print_integer( cell * null, cell * exp )
 static cell * print( cell * null, cell * exp );
 cell * print_list( cell * null, cell * lst )
 {
-	put_char( '(' );
+	cell * c = lst;
+	cell * queue = null;
 	while( 1 )
 	{
-		print( null, lst->car );
+		queue = cons( null, c, queue );
+		if( is_tuple( null, c ) != null ) c = c->cdr; else break;
+	}
 
-		if( lst->cdr == null )
+	if( is_null( null, queue->car ) != null )
+	{
+		put_char( '(' );
+		c = lst;
+		while( 1 )
 		{
-			put_char( ')' );
-			break;
+			print( null, c->car );
+
+			if( is_null( null, c->cdr ) != null )
+			{
+				put_char( ')' );
+				break;
+			}
+			else
+			{
+				put_char( ' ' );
+				c = c->cdr;
+			}
 		}
-		lst = lst->cdr;
-		if( is_tuple( null, lst ) == null )
+	}
+	else
+	{
+		queue = reverse( null, queue );
+		c = queue;
+		int depth = 0;
+		while( 1 )
 		{
-			put_char( ' ' ); put_char( '.' ); put_char( ' ' );
-			print( null, lst );
-			put_char( ')' );
-			break;
+			if( is_null( null, c ) != null )
+			{
+				break;
+			}
+			else
+			{
+				if( is_tuple( null, c->car ) != null )
+				{
+					put_char( '('); put_char( '.'); put_char( ' ');
+					depth++;
+					print( null, c->car->car );
+					put_char( ' ');
+				}
+				else
+				{
+					print( null, c->car );
+				}
+				c = c->cdr;
+			}
 		}
-		put_char( ' ' );
+		while( depth > 0 )
+		{
+			put_char( ')');
+			depth--;
+		}
 	}
 	return lst;
 }
@@ -276,8 +319,7 @@ static cell * print( cell * null, cell * exp )
 					halt( 9 );
 					break;
 				case CELL_PROCEDURE:
-					put_char( 'p' ); put_char( 'r' ); put_char( 'o' ); put_char( 'c' );
-					put_char( 0x30 + integer_value( exp ) );
+					put_char( 'p' ); put_char( '0' + integer_value( exp ) );
 					break;
 				case CELL_LAMBDA:
 				case CELL_FEXPR:
@@ -292,74 +334,50 @@ static cell * print( cell * null, cell * exp )
 static cell * read_integer( cell * null )
 {
 	unsigned char c = get_char( );
-	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9
+	if( ( c >= '0' ) && ( c <= '9' ) )
 	{
-		c -= 0x30;
+		c -= '0';
 	}
 	else
 	{	
-		if( ( c >= 0x61 ) && ( c <= 0x66 ) ) // a - f
+		if( ( c >= 'a' ) && ( c <= 'f' ) )
 		{
-			c -= 0x57;
+			c -= ( 'a' - 10 );
 		}
 		else
 		{
 			halt( 3 );
 		}
 	}
-	c = c * 0x10;
+	c = c << 4;
 	unsigned char d = get_char( );
-	if( ( d >= 0x30 ) && ( d <= 0x39 ) ) // 0 - 9
+	if( ( d >= '0' ) && ( d <= '9' ) )
 	{
-		d -= 0x30;
+		d -= '0';
 	}
 	else
 	{	
-		if( ( d >= 0x61 ) && ( d <= 0x66 ) ) // a - f
+		if( ( d >= 'a' ) && ( d <= 'f' ) )
 		{
-			d -= 0x57;
+			d -= ( 'a' - 10 );
 		}
 	}
 	c += d;
-	return integer( null, c );
+	return integer( null, (unsigned char) c );
 }
 
 static cell * read( cell * null );
 static cell * read_list( cell * null, cell * lst )
 {
 	cell * c = read( null );
-
 	if( ( cell_type( c ) == CELL_SYMBOL )
-	 && ( symbol_value( c ) == '.' )
-         && ( cell_type( lst ) == CELL_TUPLE ) )
+	 && ( symbol_value( c ) == ')' ) )
 	{
-		cell * d = read( null );
-		if( ( cell_type( d ) != CELL_SYMBOL )
-		 || ( symbol_value( d ) != ')' ) )
-		{
-			cell * e = read( null );
-			if( ( cell_type( e ) == CELL_SYMBOL )
-			 && ( symbol_value( e ) == ')' ) )
-			{
-				if( cell_type( lst->cdr ) == CELL_NULL )
-				{
-					return cons( null, lst->car, cons( null, c, cons( null, d, null ) ) );
-				}
-			}
-		}
-		halt( 4 );
+		return reverse( null, lst );
 	}
 	else
 	{
-		if( ( cell_type( c ) == CELL_SYMBOL )
-		 && ( symbol_value( c ) == ')' ) )
-		{
-			return reverse( null, lst );
-		}
-		else
-		{
-			return read_list( null, cons( null, c, lst ) );
-		}
+		return read_list( null, cons( null, c, lst ) );
 	}
 }
 
@@ -368,6 +386,11 @@ static cell * read( cell * null )
 	unsigned char c, d;
 
 	c = get_char( );
+	if( c == ';' )
+	{
+		while( c != '\n' ) c = get_char( );
+		return read( null );
+	}
 	if( ( c == ' ' ) || ( c == '\t' ) || ( c == '\n' ) )
 	{
 		return read( null );
@@ -384,7 +407,7 @@ static cell * read( cell * null )
 			halt( 3 );
 		}
 	}
-	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9 sans 0x prefix
+	if( ( c >= '0' ) && ( c <= '9' ) ) // 0 - 9 sans 0x prefix
 	{
 		halt( 3 );
 	}
@@ -396,12 +419,13 @@ static cell * read( cell * null )
 	{
 		return symbol( null, c );
 	}
-	if( ( c >= 0x21 ) && ( c <= 0x7e ) ) // printable
+	if( ( c >= '!' ) && ( c <= '~' ) ) // printable
 	{
 		return symbol( null, c );
 	}
 	
 	halt( 2 );
+	return null;
 }
 
 static cell * eval( cell * null, cell * exp, cell * env );
@@ -415,7 +439,7 @@ static cell * apply_terms( cell * null, cell * formals, cell * args, cell * term
 		args = args->cdr;
 	}
 
-	cell * ans, * res;
+	cell * ans, * res = null;
 	while( is_tuple( null, terms ) != null )
 	{
 		ans = eval( null, terms->car, tmp );
@@ -428,12 +452,9 @@ static cell * apply_terms( cell * null, cell * formals, cell * args, cell * term
 }
 
 static cell * eval_list( cell * null, cell * lst, cell * env );
-static cell * apply( cell * null, cell * exp, cell * args, cell * env )
+static cell * apply( cell * null, cell * op, cell * args, cell * env )
 {
-	cell * ans = eval( null, exp, env );
-	cell * op  = ans->car;
-	env = ans->cdr;
-
+	cell * ans;
 	switch( operator_type( op ) )
 	{
 		case CELL_FUNCTION:
@@ -441,32 +462,58 @@ static cell * apply( cell * null, cell * exp, cell * args, cell * env )
 			break;
 		case CELL_PROCEDURE:
 		{
-			dprintf( "apply: proc: " ); print( null, op ); put_char( ' ' ); print( null, args ); put_char( '\n' );
-			ans  = eval_list( null, args, env );
-			args = ans->car; env = ans->cdr;
-
-			switch( integer_value( op ) )
+			dprintf( "apply: procedure \n" );
+			if( op->bytes == apply )
 			{
-				case 1:
+				return eval( null, args, env );
+				break;
+			}
+			else
+			{
+				ans  = eval_list( null, args, env );
+				args = ans->car; env = ans->cdr;
+				switch( integer_value( op ) )
 				{
-					cell * (* proc)(cell *, cell *) = (void *) op->bytes;
-					ans = proc( null, args->car );
-					break;
+					case 0:
+					{
+						cell * (* proc)(cell *) = (void *) op->bytes;
+						ans = proc( null );
+						break;
+					}
+					case 1:
+					{
+						cell * (* proc)(cell *, cell *) = (void *) op->bytes;
+						ans = proc( null, args->car );
+						break;
+					}
+					case 2:
+					{
+						cell * (* proc)(cell *, cell *, cell *) = (void *) op->bytes;
+						ans = proc( null, args->car, args->cdr->car );
+						break;
+					}
+					case 3:
+					{
+						cell * (* proc)(cell *, cell *, cell *, cell *) = (void *) op->bytes;
+						ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car );
+						break;
+					}
+					case 4:
+					{
+						cell * (* proc)(cell *, cell *, cell *, cell *, cell *) = (void *) op->bytes;
+						ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car, args->cdr->cdr->cdr->car );
+						break;
+					}
+					default:
+						halt( 7 );
 				}
-				case 2:
-				{
-					cell * (* proc)(cell *, cell *, cell *) = (void *) op->bytes;
-					ans = proc( null, args->car, args->cdr->car );
-					break;
-				}
-				default:
-					halt( 6 );
 			}
 			return cons( null, ans, env );
 			break;
 		}
 		case CELL_LAMBDA:
 		{
+			dprintf( "apply: ^\n" );
 			ans  = eval_list( null, args, env );
 			args = ans->car; env = ans->cdr;
 
@@ -478,6 +525,7 @@ static cell * apply( cell * null, cell * exp, cell * args, cell * env )
 		}
 		case CELL_FEXPR:
 		{
+			dprintf( "apply: $\n" );
 			args = cons( null, car( null, args ), cons( null, env, null ) );
 
 			cell * fmls = op->operation->cdr->car;
@@ -488,6 +536,7 @@ static cell * apply( cell * null, cell * exp, cell * args, cell * env )
 		}
 	}
 	halt( 6 );
+	return null;
 }
 
 static cell * eval_list( cell * null, cell * lst, cell * env )
@@ -568,9 +617,17 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						return cons( null, fexpr( null, exp ), env );
 						break;
 					}
+					case 'k': // fundamental ?
+					{
+						cell * ans = eval_list( null, exp->cdr, env );
+						return cons( null, ans->car, ans->cdr );
+						break;
+					}
 				}
 			}
-			return apply( null, first, exp->cdr, env );
+			dprintf( "eval: applying " ); print( null, first ); put_char( '\n' );
+			cell * ans = eval( null, first, env );
+			return apply( null, ans->car, exp->cdr, ans->cdr );
 			break;
 		}
 		case CELL_SYMBOL:
@@ -591,6 +648,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			break;
 	}
 	halt( 4 );
+	return null;
 }
 
 static cell * repl( cell * null, cell * env )
@@ -608,8 +666,32 @@ int main( )
 	cell * null = sire( );
 	cell * env  = null;
 
-	env = cons( null, cons( null, symbol( null, '_' ), procedure( null, 1, is_null ) ), env );
-	env = cons( null, cons( null, symbol( null, '.' ), procedure( null, 2, cons    ) ), env );
+	env = cons( null, cons( null, symbol( null, 'h'  ), procedure( null, 1, quit          ) ), env );
+	env = cons( null, cons( null, symbol( null, '#'  ), procedure( null, 1, car           ) ), env );
+	env = cons( null, cons( null, symbol( null, '%'  ), procedure( null, 1, cdr           ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x00 ), procedure( null, 2, set_car       ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x01 ), procedure( null, 2, set_cdr       ) ), env );
+	env = cons( null, cons( null, symbol( null, '_'  ), procedure( null, 1, is_null       ) ), env );
+	env = cons( null, cons( null, symbol( null, 't'  ), procedure( null, 1, is_tuple      ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x02 ), procedure( null, 1, is_atom       ) ), env );
+	env = cons( null, cons( null, symbol( null, 's'  ), procedure( null, 1, is_symbol     ) ), env );
+	env = cons( null, cons( null, symbol( null, 'i'  ), procedure( null, 1, is_integer    ) ), env );
+	env = cons( null, cons( null, symbol( null, '.'  ), procedure( null, 2, cons          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x03 ), procedure( null, 1, lambda        ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x04 ), procedure( null, 1, fexpr         ) ), env );
+	env = cons( null, cons( null, symbol( null, '='  ), procedure( null, 2, equals        ) ), env );
+	env = cons( null, cons( null, symbol( null, 'q'  ), procedure( null, 2, assq          ) ), env );
+	env = cons( null, cons( null, symbol( null, '\\' ), procedure( null, 1, reverse       ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x05 ), procedure( null, 1, print_integer ) ), env );
+	env = cons( null, cons( null, symbol( null, 'p'  ), procedure( null, 1, print         ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x06 ), procedure( null, 1, read_integer  ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x07 ), procedure( null, 1, read_list     ) ), env );
+	env = cons( null, cons( null, symbol( null, 'r'  ), procedure( null, 0, read          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x08 ), procedure( null, 4, apply_terms   ) ), env );
+	env = cons( null, cons( null, symbol( null, ':'  ), procedure( null, 3, apply         ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x09 ), procedure( null, 2, eval_list     ) ), env );
+	env = cons( null, cons( null, symbol( null, 'e'  ), procedure( null, 2, eval          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x0a ), procedure( null, 1, repl          ) ), env );
 
 	repl( null, env );
 	return 0;
