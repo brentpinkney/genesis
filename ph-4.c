@@ -617,7 +617,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						return cons( null, fexpr( null, exp ), env );
 						break;
 					}
-					case 'k': // fundamental ?
+					case 'k': // not fundamental, convenience until fexpr
 					{
 						cell * ans = eval_list( null, exp->cdr, env );
 						return cons( null, ans->car, ans->cdr );
