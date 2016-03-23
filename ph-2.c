@@ -275,38 +275,14 @@ static cell * read( cell * null );
 static cell * read_list( cell * null, cell * lst )
 {
 	cell * c = read( null );
-
 	if( ( cell_type( c ) == CELL_SYMBOL )
-	 && ( symbol_value( c ) == '.' )
-         && ( cell_type( lst ) == CELL_TUPLE ) )
+	 && ( symbol_value( c ) == ')' ) )
 	{
-		cell * d = read( null );
-		if( ( cell_type( d ) != CELL_SYMBOL )
-		 || ( symbol_value( d ) != ')' ) )
-		{
-			cell * e = read( null );
-			if( ( cell_type( e ) == CELL_SYMBOL )
-			 && ( symbol_value( e ) == ')' ) )
-			{
-				if( cell_type( lst->cdr ) == CELL_NULL )
-				{
-					return cons( null, lst->car, cons( null, c, cons( null, d, null ) ) );
-				}
-			}
-		}
-		halt( 4 );
+		return reverse( null, lst );
 	}
 	else
 	{
-		if( ( cell_type( c ) == CELL_SYMBOL )
-		 && ( symbol_value( c ) == ')' ) )
-		{
-			return reverse( null, lst );
-		}
-		else
-		{
-			return read_list( null, cons( null, c, lst ) );
-		}
+		return read_list( null, cons( null, c, lst ) );
 	}
 }
 
@@ -315,6 +291,11 @@ static cell * read( cell * null )
 	unsigned char c, d;
 
 	c = get_char( );
+	if( c == ';' )
+	{
+		while( c != '\n' ) c = get_char( );
+		return read( null );
+	}
 	if( ( c == ' ' ) || ( c == '\t' ) || ( c == '\n' ) )
 	{
 		return read( null );
