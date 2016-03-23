@@ -100,8 +100,9 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
-static cell * function( cell * null, cell * exp ) { halt( 9 ); return null; }
-static cell * procedure( cell * null, cell * exp ) { halt( 9 ); return null; }
+// static cell * function( cell * null, cell * exp ) { halt( 99 ); return null; }
+
+// static cell * procedure( cell * null, cell * exp ) { halt( 99 ); return null; }
 
 unsigned char put_char( unsigned char c )
 {
@@ -210,38 +211,78 @@ static cell * print_integer( cell * null, cell * exp )
 	unsigned long i;
 	put_char( '0' ); put_char( 'x' );
 	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
-	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0'; 
 	put_char( i );
 
 	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
-	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0'; 
 	put_char( i );
 
 	return exp;
 }
-
 static cell * print( cell * null, cell * exp );
 cell * print_list( cell * null, cell * lst )
 {
-	put_char( '(' );
+	cell * c = lst;
+	cell * queue = null;
 	while( 1 )
 	{
-		print( null, lst->car );
+		queue = cons( null, c, queue );
+		if( is_tuple( null, c ) != null ) c = c->cdr; else break;
+	}
 
-		if( lst->cdr == null )
+	if( is_null( null, queue->car ) != null )
+	{
+		put_char( '(' );
+		c = lst;
+		while( 1 )
 		{
-			put_char( ')' );
-			break;
+			print( null, c->car );
+
+			if( is_null( null, c->cdr ) != null )
+			{
+				put_char( ')' );
+				break;
+			}
+			else
+			{
+				put_char( ' ' );
+				c = c->cdr;
+			}
 		}
-		lst = lst->cdr;
-		if( is_tuple( null, lst ) == null )
+	}
+	else
+	{
+		queue = reverse( null, queue );
+		c = queue;
+		int depth = 0;
+		while( 1 )
 		{
-			put_char( ' ' ); put_char( '.' ); put_char( ' ' );
-			print( null, lst );
-			put_char( ')' );
-			break;
+			if( is_null( null, c ) != null )
+			{
+				break;
+			}
+			else
+			{
+				if( is_tuple( null, c->car ) != null )
+				{
+					put_char( '('); put_char( '.'); put_char( ' ');
+					depth++;
+					print( null, c->car->car );
+					put_char( ' ');
+				}
+				else
+				{
+					print( null, c->car );
+				}
+				c = c->cdr;
+			}
 		}
-		put_char( ' ' );
+		while( depth > 0 )
+		{
+			put_char( ')');
+			depth--;
+		}
 	}
 	return lst;
 }
@@ -282,74 +323,50 @@ static cell * print( cell * null, cell * exp )
 static cell * read_integer( cell * null )
 {
 	unsigned char c = get_char( );
-	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9
+	if( ( c >= '0' ) && ( c <= '9' ) )
 	{
-		c -= 0x30;
+		c -= '0';
 	}
 	else
 	{	
-		if( ( c >= 0x61 ) && ( c <= 0x66 ) ) // a - f
+		if( ( c >= 'a' ) && ( c <= 'f' ) )
 		{
-			c -= 0x57;
+			c -= ( 'a' - 10 );
 		}
 		else
 		{
 			halt( 3 );
 		}
 	}
-	c = c * 0x10;
+	c = c << 4;
 	unsigned char d = get_char( );
-	if( ( d >= 0x30 ) && ( d <= 0x39 ) ) // 0 - 9
+	if( ( d >= '0' ) && ( d <= '9' ) )
 	{
-		d -= 0x30;
+		d -= '0';
 	}
 	else
 	{	
-		if( ( d >= 0x61 ) && ( d <= 0x66 ) ) // a - f
+		if( ( d >= 'a' ) && ( d <= 'f' ) )
 		{
-			d -= 0x57;
+			d -= ( 'a' - 10 );
 		}
 	}
 	c += d;
-	return integer( null, c );
+	return integer( null, (unsigned char) c );
 }
 
 static cell * read( cell * null );
 static cell * read_list( cell * null, cell * lst )
 {
 	cell * c = read( null );
-
 	if( ( cell_type( c ) == CELL_SYMBOL )
-	 && ( symbol_value( c ) == '.' )
-         && ( cell_type( lst ) == CELL_TUPLE ) )
+	 && ( symbol_value( c ) == ')' ) )
 	{
-		cell * d = read( null );
-		if( ( cell_type( d ) != CELL_SYMBOL )
-		 || ( symbol_value( d ) != ')' ) )
-		{
-			cell * e = read( null );
-			if( ( cell_type( e ) == CELL_SYMBOL )
-			 && ( symbol_value( e ) == ')' ) )
-			{
-				if( cell_type( lst->cdr ) == CELL_NULL )
-				{
-					return cons( null, lst->car, cons( null, c, cons( null, d, null ) ) );
-				}
-			}
-		}
-		halt( 4 );
+		return reverse( null, lst );
 	}
 	else
 	{
-		if( ( cell_type( c ) == CELL_SYMBOL )
-		 && ( symbol_value( c ) == ')' ) )
-		{
-			return reverse( null, lst );
-		}
-		else
-		{
-			return read_list( null, cons( null, c, lst ) );
-		}
+		return read_list( null, cons( null, c, lst ) );
 	}
 }
 
@@ -358,6 +375,11 @@ static cell * read( cell * null )
 	unsigned char c, d;
 
 	c = get_char( );
+	if( c == ';' )
+	{
+		while( c != '\n' ) c = get_char( );
+		return read( null );
+	}
 	if( ( c == ' ' ) || ( c == '\t' ) || ( c == '\n' ) )
 	{
 		return read( null );
@@ -374,7 +396,7 @@ static cell * read( cell * null )
 			halt( 3 );
 		}
 	}
-	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9 sans 0x prefix
+	if( ( c >= '0' ) && ( c <= '9' ) ) // 0 - 9 sans 0x prefix
 	{
 		halt( 3 );
 	}
@@ -386,12 +408,13 @@ static cell * read( cell * null )
 	{
 		return symbol( null, c );
 	}
-	if( ( c >= 0x21 ) && ( c <= 0x7e ) ) // printable
+	if( ( c >= '!' ) && ( c <= '~' ) ) // printable
 	{
 		return symbol( null, c );
 	}
 	
 	halt( 2 );
+	return null;
 }
 
 static cell * eval( cell * null, cell * exp, cell * env );
@@ -407,7 +430,7 @@ static cell * apply_terms( cell * null, cell * formals, cell * args, cell * term
 		args = args->cdr;
 	}
 
-	cell * ans, * res;
+	cell * ans, * res = null;
 	while( is_tuple( null, terms ) != null )
 	{
 		ans = eval( null, terms->car, tmp );
@@ -420,28 +443,16 @@ static cell * apply_terms( cell * null, cell * formals, cell * args, cell * term
 }
 
 static cell * eval_list( cell * null, cell * lst, cell * env );
-static cell * apply( cell * null, cell * exp, cell * args, cell * env )
+static cell * apply( cell * null, cell * op, cell * args, cell * env )
 {
-	dprintf( "apply:\n" );
-	dprintf( "apply: exp: " ); print( null, exp ); put_char( '\n' );
-	dprintf( "apply: env: " ); print( null, env ); put_char( '\n' );
-	cell * ans = eval( null, exp, env );
-	cell * op  = ans->car;
-	dprintf( "apply:  op: " ); print( null, op ); put_char( '\n' );
-	dprintf( "apply:  op %016lx\n", op->header );
-	env = ans->cdr;
-
+	cell * ans;
+	dprintf( "apply: " ); print( null, op ); dprintf( " to " ); print( null, args ); put_char( '\n' );
 	switch( operator_type( op ) )
 	{
 		case CELL_FUNCTION:
-			halt( 99 );
-			break;
 		case CELL_PROCEDURE:
-		{
-			cell * (* proc)(cell *, cell *) = (void *) op->bytes;
 			halt( 99 );
 			break;
-		}
 		case CELL_LAMBDA:
 		{
 			dprintf( "apply: ^\n" );
@@ -467,6 +478,7 @@ static cell * apply( cell * null, cell * exp, cell * args, cell * env )
 		}
 	}
 	halt( 6 );
+	return null;
 }
 
 static cell * eval_list( cell * null, cell * lst, cell * env )
@@ -557,8 +569,9 @@ static cell * eval( cell * null, cell * exp, cell * env )
 					}
 				}
 			}
-			dprintf( "eval: not special, apply…\n" );
-			return apply( null, first, exp->cdr, env );
+			dprintf( "eval: applying " ); print( null, first ); put_char( '\n' );
+			cell * ans = eval( null, first, env );
+			return apply( null, ans->car, exp->cdr, ans->cdr );
 			break;
 		}
 		case CELL_SYMBOL:
@@ -581,6 +594,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			break;
 	}
 	halt( 4 );
+	return null;
 }
 
 static cell * repl( cell * null, cell * env )
