@@ -463,6 +463,7 @@ static cell * eval_list( cell * null, cell * lst, cell * env );
 static cell * apply( cell * null, cell * op, cell * args, cell * env )
 {
 	cell * ans;
+	dprintf( "apply: operator type = %02lx\n", operator_type( op ) );
 	switch( operator_type( op ) )
 	{
 		case CELL_FUNCTION:
@@ -470,51 +471,56 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			break;
 		case CELL_PROCEDURE:
 		{
-			dprintf( "apply: procedure \n" );
+			dprintf( "apply: procedure\n" );
 			if( op->bytes == apply )
 			{
+				dprintf( "apply: recurse on apply\n" );
 				return eval( null, args, env );
 				break;
 			}
-			else
+			if( op->bytes == eval )
 			{
-				ans  = eval_list( null, args, env );
-				args = ans->car; env = ans->cdr;
-				switch( integer_value( op ) )
+				dprintf( "apply: recurse on eval \n" );
+				return eval( null, args->car, env );
+				break;
+			}
+			// else
+			ans  = eval_list( null, args, env );
+			args = ans->car; env = ans->cdr;
+			switch( integer_value( op ) )
+			{
+				case 0:
 				{
-					case 0:
-					{
-						cell * (* proc)(cell *) = (void *) op->bytes;
-						ans = proc( null );
-						break;
-					}
-					case 1:
-					{
-						cell * (* proc)(cell *, cell *) = (void *) op->bytes;
-						ans = proc( null, args->car );
-						break;
-					}
-					case 2:
-					{
-						cell * (* proc)(cell *, cell *, cell *) = (void *) op->bytes;
-						ans = proc( null, args->car, args->cdr->car );
-						break;
-					}
-					case 3:
-					{
-						cell * (* proc)(cell *, cell *, cell *, cell *) = (void *) op->bytes;
-						ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car );
-						break;
-					}
-					case 4:
-					{
-						cell * (* proc)(cell *, cell *, cell *, cell *, cell *) = (void *) op->bytes;
-						ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car, args->cdr->cdr->cdr->car );
-						break;
-					}
-					default:
-						halt( 7 );
+					cell * (* proc)(cell *) = (void *) op->bytes;
+					ans = proc( null );
+					break;
 				}
+				case 1:
+				{
+					cell * (* proc)(cell *, cell *) = (void *) op->bytes;
+					ans = proc( null, args->car );
+					break;
+				}
+				case 2:
+				{
+					cell * (* proc)(cell *, cell *, cell *) = (void *) op->bytes;
+					ans = proc( null, args->car, args->cdr->car );
+					break;
+				}
+				case 3:
+				{
+					cell * (* proc)(cell *, cell *, cell *, cell *) = (void *) op->bytes;
+					ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car );
+					break;
+				}
+				case 4:
+				{
+					cell * (* proc)(cell *, cell *, cell *, cell *, cell *) = (void *) op->bytes;
+					ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car, args->cdr->cdr->cdr->car );
+					break;
+				}
+				default:
+					halt( 7 );
 			}
 			return cons( null, ans, env );
 			break;
@@ -562,6 +568,7 @@ static cell * eval_list( cell * null, cell * lst, cell * env )
 
 static cell * eval( cell * null, cell * exp, cell * env )
 {
+	dprintf( "eval: exp = " ); print( null, exp ); put_char( '\n' );
 	switch( cell_type( exp ) )
 	{
 		case CELL_NULL:
@@ -629,6 +636,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			}
 			dprintf( "eval: applying " ); print( null, first ); dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
 			cell * ans = eval( null, first, env );
+			dprintf( "eval: about to apply " ); print( null, ans->car ); put_char( '\n' );
 			return apply( null, ans->car, exp->cdr, ans->cdr );
 			break;
 		}
@@ -698,4 +706,3 @@ int main( )
 	repl( null, env );
 	return 0;
 }
-
