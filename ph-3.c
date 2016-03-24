@@ -220,6 +220,7 @@ static cell * print_integer( cell * null, cell * exp )
 
 	return exp;
 }
+
 static cell * print( cell * null, cell * exp );
 cell * print_list( cell * null, cell * lst )
 {
@@ -418,18 +419,25 @@ static cell * read( cell * null )
 }
 
 static cell * eval( cell * null, cell * exp, cell * env );
-static cell * apply_terms( cell * null, cell * formals, cell * args, cell * terms, cell * env )
+static cell * apply_forms( cell * null, cell * formals, cell * args, cell * terms, cell * env )
 {
-	dprintf( "apply_terms:\n" );
-
+	dprintf( "apply_forms:\n" );
 	cell * tmp  = env;				// any set! will be lost on return
 	while( is_tuple( null, formals ) != null )
 	{
-		tmp = cons( null, cons( null, formals->car, args->car ), tmp );
+		if( ( is_null( null, formals->cdr ) != null )
+			&& ( is_null( null, args->cdr ) == null ) )
+		{
+			tmp = cons( null, cons( null, formals->car, args ), tmp );
+		}
+		else
+		{
+			tmp = cons( null, cons( null, formals->car, args->car ), tmp );
+		}
 		formals = formals->cdr;
 		args = args->cdr;
 	}
-
+	
 	cell * ans, * res = null;
 	while( is_tuple( null, terms ) != null )
 	{
@@ -462,7 +470,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
-			return apply_terms( null, fmls, args, body, env );
+			return apply_forms( null, fmls, args, body, env );
 			break;
 		}
 		case CELL_FEXPR:
@@ -473,7 +481,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
-			return apply_terms( null, fmls, args, body, env );
+			return apply_forms( null, fmls, args, body, env );
 			break;
 		}
 	}
