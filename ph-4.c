@@ -59,7 +59,7 @@ static cell * allocate( cell * null, unsigned long words )
 
 static cell * sire( )
 {
-	unsigned long bytes = PAGE_SIZE * 1;
+	unsigned long bytes = PAGE_SIZE * 1024;
 	void * arena = mmap(
 			0,
 			bytes,
@@ -521,6 +521,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 		}
 		case CELL_LAMBDA:
 		{
+			dprintf( "apply: lambda\n" );
 			ans  = eval_list( null, args, env );
 			args = ans->car; env = ans->cdr;
 
@@ -532,6 +533,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 		}
 		case CELL_FEXPR:
 		{
+			dprintf( "apply: fexpr\n" );
 			args = cons( null, car( null, args ), cons( null, env, null ) );
 
 			cell * fmls = op->operation->cdr->car;
@@ -625,7 +627,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 					}
 				}
 			}
-			dprintf( "eval: applying " ); print( null, first ); put_char( '\n' );
+			dprintf( "eval: applying " ); print( null, first ); dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
 			cell * ans = eval( null, first, env );
 			return apply( null, ans->car, exp->cdr, ans->cdr );
 			break;
