@@ -1,7 +1,7 @@
 ;;; pre-history
 
 ;;; (kEFGH…) (list e f g h …)
-(!k(^(E)E))
+(!k(^(E)(?(tE)E(.E()))))
 
 ;;; (~E) (not e)
 (!~(^(E)(?E()0xff)))
