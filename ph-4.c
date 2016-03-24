@@ -429,12 +429,20 @@ static cell * read( cell * null )
 }
 
 static cell * eval( cell * null, cell * exp, cell * env );
-static cell * apply_terms( cell * null, cell * formals, cell * args, cell * terms, cell * env )
+static cell * apply_forms( cell * null, cell * formals, cell * args, cell * terms, cell * env )
 {
 	cell * tmp  = env;				// any set! will be lost on return
 	while( is_tuple( null, formals ) != null )
 	{
-		tmp = cons( null, cons( null, formals->car, args->car ), tmp );
+		if( ( is_null( null, formals->cdr ) != null )
+			&& ( is_null( null, args->cdr ) == null ) )
+		{
+			tmp = cons( null, cons( null, formals->car, args ), tmp );
+		}
+		else
+		{
+			tmp = cons( null, cons( null, formals->car, args->car ), tmp );
+		}
 		formals = formals->cdr;
 		args = args->cdr;
 	}
@@ -513,25 +521,23 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 		}
 		case CELL_LAMBDA:
 		{
-			dprintf( "apply: ^\n" );
 			ans  = eval_list( null, args, env );
 			args = ans->car; env = ans->cdr;
 
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
-			return apply_terms( null, fmls, args, body, env );
+			return apply_forms( null, fmls, args, body, env );
 			break;
 		}
 		case CELL_FEXPR:
 		{
-			dprintf( "apply: $\n" );
 			args = cons( null, car( null, args ), cons( null, env, null ) );
 
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
-			return apply_terms( null, fmls, args, body, env );
+			return apply_forms( null, fmls, args, body, env );
 			break;
 		}
 	}
@@ -617,12 +623,6 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						return cons( null, fexpr( null, exp ), env );
 						break;
 					}
-					case 'k': // not fundamental, convenience until fexpr
-					{
-						cell * ans = eval_list( null, exp->cdr, env );
-						return cons( null, ans->car, ans->cdr );
-						break;
-					}
 				}
 			}
 			dprintf( "eval: applying " ); print( null, first ); put_char( '\n' );
@@ -687,7 +687,7 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 0x06 ), procedure( null, 1, read_integer  ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x07 ), procedure( null, 1, read_list     ) ), env );
 	env = cons( null, cons( null, symbol( null, 'r'  ), procedure( null, 0, read          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x08 ), procedure( null, 4, apply_terms   ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x08 ), procedure( null, 4, apply_forms   ) ), env );
 	env = cons( null, cons( null, symbol( null, ':'  ), procedure( null, 3, apply         ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x09 ), procedure( null, 2, eval_list     ) ), env );
 	env = cons( null, cons( null, symbol( null, 'e'  ), procedure( null, 2, eval          ) ), env );

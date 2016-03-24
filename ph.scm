@@ -1,5 +1,8 @@
 ;;; pre-history
 
+;;; (kEFGH…) (list e f g h …)
+(!k(^(E)E))
+
 ;;; (~E) (not e)
 (!~(^(E)(?E()0xff)))
 
@@ -9,5 +12,3 @@
 ;;; ('E)  = (quote e)
 (!'($(EV)E))
 
-;;; (kEFGH…) (list e f g h …)
-(!k ($ (EV) (%E) ))
