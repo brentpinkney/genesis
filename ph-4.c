@@ -278,7 +278,7 @@ cell * print_list( cell * null, cell * lst )
 			{
 				if( is_tuple( null, c->car ) is_true )
 				{
-					put_char( '(' ); put_char( '*' ); put_char( ' ' );
+					put_char( '(' ); put_char( '.' ); put_char( ' ' );
 					depth++;
 					print( null, c->car->car );
 					put_char( ' ' );
@@ -478,12 +478,11 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 	switch( operator_type( op ) )
 	{
 		case CELL_FUNCTION:
-			halt( 99 );
+			halt( 8 );
 			break;
 		case CELL_PROCEDURE:
 		{
 			int evaluated = 0;
-			dprintf( "apply: procedure\n" );
 			if( op->bytes == eval )
 			{
 				evaluated = 1;
@@ -539,9 +538,8 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 				default:
 					halt( 7 );
 			}
-			dprintf( "apply: applied\n" );
 			return evaluated
-				? ans //cons( null, ans->car, env )
+				? ans
 				: cons( null, ans, env );	// any set! will be lost on return
 		}
 		case CELL_LAMBDA:
