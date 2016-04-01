@@ -12,10 +12,10 @@
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
 #define CELL_OPERATOR		0x05
-#define CELL_FUNCTION		0x15	// machine language, no REPL access
-#define CELL_PROCEDURE		0x25	// machine language, REPL access
-#define CELL_LAMBDA		0x35	// operative s-expressions
-#define CELL_FEXPR		0x45	// applicative s-expressions
+#define CELL_FUNCTION		0x05	// machine language, no REPL access
+#define CELL_PROCEDURE		0x15	// machine language, REPL access
+#define CELL_LAMBDA		0x25	// operative s-expressions
+#define CELL_FEXPR		0x35	// applicative s-expressions
 #define MASK_TYPE		0x07
 #define MASK_SYMBOL		0xff00
 #define MASK_INTEGER		0xff00
@@ -29,6 +29,9 @@ int verbose = 1;
 #define operator_type( c ) ( c->header & MASK_OPERATOR )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
+
+#define is_true  != null
+#define is_false == null
 
 struct _cell;
 typedef struct _cell cell;
@@ -135,7 +138,7 @@ static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CEL
 
 static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
 
-static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) != null ) ? null : null->size; }
+static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) is_true ) ? null : null->size; }
 
 static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
 
@@ -168,7 +171,7 @@ static cell * fexpr( cell * null, cell * exp )
 
 static cell * equals( cell * null, cell * a, cell * b )
 {
-	if( ( is_atom( null, a ) != null ) && ( is_atom( null, b ) != null ) )
+	if( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
 	{
 		return ( a->header == b->header ) ? null->size : null;
 	}
@@ -180,13 +183,13 @@ static cell * equals( cell * null, cell * a, cell * b )
 
 static cell * assq( cell * null, cell * key, cell * alist )
 {
-	if( is_null( null, alist ) != null )
+	if( is_null( null, alist ) is_true )
 	{
 		return null;
 	}
 	else
 	{
-		if( equals( null, key, car( null, car( null, alist ) ) ) != null )
+		if( equals( null, key, car( null, car( null, alist ) ) ) is_true )
 		{
 			return car( null, alist );
 		}
@@ -219,11 +222,11 @@ static cell * print_integer( cell * null, cell * exp )
 	unsigned long i;
 	put_char( '0' ); put_char( 'x' );
 	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
-	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0'; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
 	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
-	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0'; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
 	return exp;
@@ -237,10 +240,10 @@ cell * print_list( cell * null, cell * lst )
 	while( 1 )
 	{
 		queue = cons( null, c, queue );
-		if( is_tuple( null, c ) != null ) c = c->cdr; else break;
+		if( is_tuple( null, c ) is_true ) c = c->cdr; else break;
 	}
 
-	if( is_null( null, queue->car ) != null )
+	if( is_null( null, queue->car ) is_true )
 	{
 		put_char( '(' );
 		c = lst;
@@ -248,7 +251,7 @@ cell * print_list( cell * null, cell * lst )
 		{
 			print( null, c->car );
 
-			if( is_null( null, c->cdr ) != null )
+			if( is_null( null, c->cdr ) is_true )
 			{
 				put_char( ')' );
 				break;
@@ -267,18 +270,18 @@ cell * print_list( cell * null, cell * lst )
 		int depth = 0;
 		while( 1 )
 		{
-			if( is_null( null, c ) != null )
+			if( is_null( null, c ) is_true )
 			{
 				break;
 			}
 			else
 			{
-				if( is_tuple( null, c->car ) != null )
+				if( is_tuple( null, c->car ) is_true )
 				{
-					put_char( '('); put_char( '.'); put_char( ' ');
+					put_char( '(' ); put_char( '*' ); put_char( ' ' );
 					depth++;
 					print( null, c->car->car );
-					put_char( ' ');
+					put_char( ' ' );
 				}
 				else
 				{
@@ -431,24 +434,33 @@ static cell * read( cell * null )
 static cell * eval( cell * null, cell * exp, cell * env );
 static cell * apply_forms( cell * null, cell * formals, cell * args, cell * terms, cell * env )
 {
-	cell * tmp  = env;				// any set! will be lost on return
-	while( is_tuple( null, formals ) != null )
+	cell * tmp  = env;
+	while( is_tuple( null, formals ) is_true )
 	{
-		if( ( is_null( null, formals->cdr ) != null )
-			&& ( is_null( null, args->cdr ) == null ) )
+		cell * arg;
+		if( ( is_null( null, formals->cdr ) is_true )
+			&& ( is_null( null, args->cdr ) is_false ) )
 		{
-			tmp = cons( null, cons( null, formals->car, args ), tmp );
+			arg = args;
 		}
 		else
 		{
-			tmp = cons( null, cons( null, formals->car, args->car ), tmp );
+			if( is_tuple( null, args ) is_true )
+			{
+				arg  = args->car;
+				args = args->cdr;
+			}
+			else
+			{
+				arg = null;
+			}
 		}
+		tmp = cons( null, cons( null, formals->car, arg ), tmp );
 		formals = formals->cdr;
-		args = args->cdr;
 	}
 
 	cell * ans, * res = null;
-	while( is_tuple( null, terms ) != null )
+	while( is_tuple( null, terms ) is_true )
 	{
 		ans = eval( null, terms->car, tmp );
 		res = ans->car;
@@ -456,14 +468,13 @@ static cell * apply_forms( cell * null, cell * formals, cell * args, cell * term
 		terms = terms->cdr;
 	}
 
-	return cons( null, res, env );
+	return cons( null, res, tmp );
 }
 
 static cell * eval_list( cell * null, cell * lst, cell * env );
 static cell * apply( cell * null, cell * op, cell * args, cell * env )
 {
 	cell * ans;
-	dprintf( "apply: operator type = %02lx\n", operator_type( op ) );
 	switch( operator_type( op ) )
 	{
 		case CELL_FUNCTION:
@@ -471,21 +482,27 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			break;
 		case CELL_PROCEDURE:
 		{
+			int evaluated = 0;
 			dprintf( "apply: procedure\n" );
-			if( op->bytes == apply )
-			{
-				dprintf( "apply: recurse on apply\n" );
-				return eval( null, args, env );
-				break;
-			}
 			if( op->bytes == eval )
 			{
-				dprintf( "apply: recurse on eval \n" );
-				return eval( null, args->car, env );
-				break;
+				evaluated = 1;
+				ans = eval( null, args->car, env );
 			}
-			// else
-			ans  = eval_list( null, args, env );
+			else if( op->bytes == eval_list )
+			{
+				evaluated = 1;
+			}
+			else if( op->bytes == apply )
+			{
+				evaluated = 1;
+				ans  = eval( null, args->car, env );
+				op   = ans->car; env = ans->cdr;
+				args = args->cdr->car;
+				ans  = apply( null, op, args, env );
+			}
+			// now invoke…
+			ans = eval_list( null, args, env );
 			args = ans->car; env = ans->cdr;
 			switch( integer_value( op ) )
 			{
@@ -522,31 +539,46 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 				default:
 					halt( 7 );
 			}
-			return cons( null, ans, env );
-			break;
+			dprintf( "apply: applied\n" );
+			return evaluated
+				? ans //cons( null, ans->car, env )
+				: cons( null, ans, env );	// any set! will be lost on return
 		}
 		case CELL_LAMBDA:
 		{
-			dprintf( "apply: lambda\n" );
-			ans  = eval_list( null, args, env );
+			ans = eval_list( null, args, env );
 			args = ans->car; env = ans->cdr;
+			dprintf( "apply: lambda, args = " ); print( null, args); put_char( '\n' );
 
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
-			return apply_forms( null, fmls, args, body, env );
-			break;
+			ans = apply_forms( null, fmls, args, body, env );
+			return cons( null, ans->car, env );	// any set! will be lost on return
 		}
 		case CELL_FEXPR:
 		{
 			dprintf( "apply: fexpr\n" );
-			args = cons( null, car( null, args ), cons( null, env, null ) );
 
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
-			return apply_forms( null, fmls, args, body, env );
-			break;
+			cell * tmp = env;
+			tmp = cons( null, cons( null, fmls->car, args ), tmp );		// E
+			tmp = cons( null, cons( null, fmls->cdr->car, env ), tmp );	// V
+
+			cell * ans, * res = null;
+			cell * terms = body;
+			while( is_tuple( null, terms ) is_true )
+			{
+				ans = eval( null, terms->car, tmp );
+				res = ans->car;
+				tmp = ans->cdr;
+				terms = terms->cdr;
+			}
+
+			dprintf( "apply: fexpr, res = " ); print( null, res ); put_char( '\n' );
+			return cons( null, res, env );		// any set! will be lost on return
 		}
 	}
 	halt( 6 );
@@ -556,7 +588,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 static cell * eval_list( cell * null, cell * lst, cell * env )
 {
 	cell * res = null;
-	while( is_tuple( null, lst ) != null )
+	while( is_tuple( null, lst ) is_true )
 	{
 		cell * ans = eval( null, lst->car, env );
 		res = cons( null, ans->car, res );
@@ -568,16 +600,14 @@ static cell * eval_list( cell * null, cell * lst, cell * env )
 
 static cell * eval( cell * null, cell * exp, cell * env )
 {
-	dprintf( "eval: exp = " ); print( null, exp ); put_char( '\n' );
 	switch( cell_type( exp ) )
 	{
 		case CELL_NULL:
 			return cons( null, null, env );
-			break;
 		case CELL_TUPLE:
 		{
 			cell * first = exp->car;
-			if( is_symbol( null, first ) != null )
+			if( is_symbol( null, first ) is_true )
 			{
 				switch( symbol_value( first ) )
 				{
@@ -589,7 +619,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						env = ans->cdr;
 
 						cell * tuple = assq( null, key, env );
-						if( is_null( null, tuple ) != null )
+						if( is_null( null, tuple ) is_true )
 						{
 							tuple = cons( null, key, val );
 							env = cons( null, tuple, env );
@@ -599,7 +629,6 @@ static cell * eval( cell * null, cell * exp, cell * env )
 							set_cdr( null, tuple, val );
 						}
 						return cons( null, tuple, env );
-						break;
 					}
 					case '?':
 					{
@@ -610,7 +639,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						cell * ans = eval( null, tst, env );
 						tst = ans->car;
 						env = ans->cdr;
-						if( is_null( null, tst ) != null )
+						if( is_null( null, tst ) is_true )
 						{
 							cell * ans = eval( null, alt, env );
 							return cons( null, ans->car, ans->cdr );
@@ -620,42 +649,32 @@ static cell * eval( cell * null, cell * exp, cell * env )
 							cell * ans = eval( null, con, env );
 							return cons( null, ans->car, ans->cdr );
 						}
-						break;
 					}
 					case '^':
 					{
 						return cons( null, lambda( null, exp ), env );
-						break;
 					}
 					case '$':
 					{
 						return cons( null, fexpr( null, exp ), env );
-						break;
 					}
 				}
 			}
-			dprintf( "eval: applying " ); print( null, first ); dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
-			cell * ans = eval( null, first, env );
-			dprintf( "eval: about to apply " ); print( null, ans->car ); put_char( '\n' );
+			// else
+			cell * ans  = eval( null, first, env );
+			dprintf( "eval: applying " ); print( null, first );
+				dprintf( " = " ); print( null, ans->car );
+					dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
 			return apply( null, ans->car, exp->cdr, ans->cdr );
-			break;
 		}
 		case CELL_SYMBOL:
 		{
 			cell * tuple = assq( null, exp, env );
-			if( is_tuple( null, tuple ) != null )
-			{
-				return cons( null, tuple->cdr, env );
-			}
-			else
-			{
-				return cons( null, null, env );
-			}
-			break;
+			cell * value = ( is_tuple( null, tuple ) is_true ) ? tuple->cdr : null;
+			return cons( null, value, env );
 		}
 		case CELL_INTEGER:
 			return cons( null, exp, env );
-			break;
 	}
 	halt( 4 );
 	return null;
@@ -699,9 +718,9 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 'r'  ), procedure( null, 0, read          ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x08 ), procedure( null, 4, apply_forms   ) ), env );
 	env = cons( null, cons( null, symbol( null, ':'  ), procedure( null, 3, apply         ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x09 ), procedure( null, 2, eval_list     ) ), env );
-	env = cons( null, cons( null, symbol( null, 'e'  ), procedure( null, 2, eval          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x0a ), procedure( null, 1, repl          ) ), env );
+	env = cons( null, cons( null, symbol( null, 'u'  ), procedure( null, 2, eval_list     ) ), env );
+	env = cons( null, cons( null, symbol( null, 'e'  ), procedure( null, 1, eval          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x09 ), procedure( null, 1, repl          ) ), env );
 
 	repl( null, env );
 	return 0;

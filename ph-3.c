@@ -437,7 +437,7 @@ static cell * apply_forms( cell * null, cell * formals, cell * args, cell * term
 		formals = formals->cdr;
 		args = args->cdr;
 	}
-	
+
 	cell * ans, * res = null;
 	while( is_tuple( null, terms ) != null )
 	{
@@ -476,12 +476,13 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 		case CELL_FEXPR:
 		{
 			dprintf( "apply: $\n" );
-			args = cons( null, car( null, args ), cons( null, env, null ) );
+			args = cons( null, env, args );
 
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
-			return apply_forms( null, fmls, args, body, env );
+			ans = apply_forms( null, fmls, args, body, env );
+			return eval( null, ans->car, env );
 			break;
 		}
 	}
@@ -577,8 +578,9 @@ static cell * eval( cell * null, cell * exp, cell * env )
 					}
 				}
 			}
-			dprintf( "eval: applying " ); print( null, first ); put_char( '\n' );
+			dprintf( "eval: applying " ); print( null, first ); dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
 			cell * ans = eval( null, first, env );
+			dprintf( "eval: about to apply " ); print( null, ans->car ); put_char( '\n' );
 			return apply( null, ans->car, exp->cdr, ans->cdr );
 			break;
 		}
