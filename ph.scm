@@ -1,5 +1,11 @@
 ;;; pre-history
 
+;;; (~E) (not e)
+(!~(^(E)(?E()0x00)))
+
+;;; (v)	= (environment)
+(!v($(EV)V))
+
 ;;; ('E) (quote e)
 (!'($(EV)(#E)))
 
@@ -13,14 +19,8 @@
 (!m(^(FL)(?L(.(F(#L))(mF(%L)))())))
 
 ;;; (bEFGH…) (begin e f g h …)
-;;; requires that the result is evaluated XXX
+(!b($(EV)(e(k(a(k('^)())E)))))
 
-(begin e f g)
-	((λ () e f g))
-
-;;; (~E) (not e)
-(!~(^(E)(?E()0x00)))
-
-;;; (v)	= (environment)
-(!v($(EV)V))
+;;; (let)
+(!l($(EV)(e(.(a(k('^)(m#(#E)))(%E))(m#(m%(#E)))))))
 
