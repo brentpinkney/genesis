@@ -700,25 +700,25 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 0x01 ), procedure( null, 2, set_cdr       ) ), env );
 	env = cons( null, cons( null, symbol( null, '_'  ), procedure( null, 1, is_null       ) ), env );
 	env = cons( null, cons( null, symbol( null, 't'  ), procedure( null, 1, is_tuple      ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x02 ), procedure( null, 1, is_atom       ) ), env );
+	env = cons( null, cons( null, symbol( null, 'a'  ), procedure( null, 1, is_atom       ) ), env );
 	env = cons( null, cons( null, symbol( null, 's'  ), procedure( null, 1, is_symbol     ) ), env );
 	env = cons( null, cons( null, symbol( null, 'i'  ), procedure( null, 1, is_integer    ) ), env );
 	env = cons( null, cons( null, symbol( null, '.'  ), procedure( null, 2, cons          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x03 ), procedure( null, 1, lambda        ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x04 ), procedure( null, 1, fexpr         ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x02 ), procedure( null, 1, lambda        ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x03 ), procedure( null, 1, fexpr         ) ), env );
 	env = cons( null, cons( null, symbol( null, '='  ), procedure( null, 2, equals        ) ), env );
 	env = cons( null, cons( null, symbol( null, 'q'  ), procedure( null, 2, assq          ) ), env );
 	env = cons( null, cons( null, symbol( null, '\\' ), procedure( null, 1, reverse       ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x05 ), procedure( null, 1, print_integer ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x04 ), procedure( null, 1, print_integer ) ), env );
 	env = cons( null, cons( null, symbol( null, 'p'  ), procedure( null, 1, print         ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x06 ), procedure( null, 1, read_integer  ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x07 ), procedure( null, 1, read_list     ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x05 ), procedure( null, 1, read_integer  ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x06 ), procedure( null, 1, read_list     ) ), env );
 	env = cons( null, cons( null, symbol( null, 'r'  ), procedure( null, 0, read          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x08 ), procedure( null, 4, apply_forms   ) ), env );
-	env = cons( null, cons( null, symbol( null, ':'  ), procedure( null, 3, apply         ) ), env );
-	env = cons( null, cons( null, symbol( null, 'u'  ), procedure( null, 2, eval_list     ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x07 ), procedure( null, 4, apply_forms   ) ), env );
+	env = cons( null, cons( null, symbol( null, 'd'  ), procedure( null, 3, apply         ) ), env ); // do…
+	env = cons( null, cons( null, symbol( null, 'o'  ), procedure( null, 2, eval_list     ) ), env ); // over…
 	env = cons( null, cons( null, symbol( null, 'e'  ), procedure( null, 1, eval          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x09 ), procedure( null, 1, repl          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x08 ), procedure( null, 1, repl          ) ), env );
 
 	repl( null, env );
 	return 0;
