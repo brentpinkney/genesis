@@ -544,9 +544,8 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 		}
 		case CELL_LAMBDA:
 		{
-			ans = eval_list( null, args, env );
+			ans  = eval_list( null, args, env );
 			args = ans->car; env = ans->cdr;
-			dprintf( "apply: lambda, args = " ); print( null, args); put_char( '\n' );
 
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
@@ -556,8 +555,6 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 		}
 		case CELL_FEXPR:
 		{
-			dprintf( "apply: fexpr\n" );
-
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
@@ -575,7 +572,6 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 				terms = terms->cdr;
 			}
 
-			dprintf( "apply: fexpr, res = " ); print( null, res ); put_char( '\n' );
 			return cons( null, res, env );		// any set! will be lost on return
 		}
 	}
@@ -660,9 +656,6 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			}
 			// else
 			cell * ans  = eval( null, first, env );
-			dprintf( "eval: applying " ); print( null, first );
-				dprintf( " = " ); print( null, ans->car );
-					dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
 			return apply( null, ans->car, exp->cdr, ans->cdr );
 		}
 		case CELL_SYMBOL:

@@ -16,6 +16,8 @@
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c ) ( c->header & MASK_TYPE )
+#define is_true  != null
+#define is_false == null
 
 struct _cell;
 typedef struct _cell cell;
@@ -25,10 +27,9 @@ struct _cell
 	union
 	{
 		struct { cell * size; void * arena, * next; };
-		struct { cell * car; cell * cdr; };
+		struct { cell * car, * cdr; };
 	};
-}
-;
+};
 
 // functions…
 static void halt( unsigned long n )
@@ -107,7 +108,7 @@ static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CEL
 
 static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
 
-static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) != null ) ? null : null->size; }
+static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) is_true ) ? null : null->size; }
 
 static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
 
@@ -125,7 +126,7 @@ static cell * cons( cell * null, cell * a, cell * b )
 
 static cell * equals( cell * null, cell * a, cell * b )
 {
-	if( ( is_atom( null, a ) != null ) && ( is_atom( null, b ) != null ) )
+	if( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
 	{
 		return ( a->header == b->header ) ? null->size : null;
 	}
@@ -137,7 +138,7 @@ static cell * equals( cell * null, cell * a, cell * b )
 
 static cell * assq( cell * null, cell * key, cell * alist )
 {
-	if( is_null( null, alist ) != null )
+	if( is_null( null, alist ) is_true )
 	{
 		dprintf( "assq: not found\n" );
 		return null;
@@ -145,7 +146,7 @@ static cell * assq( cell * null, cell * key, cell * alist )
 	else
 	{
 		dprintf( "assq: caar(alist) = %016lx\n", car( null, car( null, alist ) )->header );
-		if( equals( null, key, car( null, car( null, alist ) ) ) != null )
+		if( equals( null, key, car( null, car( null, alist ) ) ) is_true )
 		{
 			return car( null, alist );
 		}

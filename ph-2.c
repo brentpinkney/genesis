@@ -17,9 +17,14 @@
 #define MASK_INTEGER_LO		0x0f00
 
 int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stderr,  __VA_ARGS__ )
-#define cell_type( c )    ( c->header & MASK_TYPE )
-#define symbol_value( s ) ( ( s->header & MASK_SYMBOL )  >> 8 )
+#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
+#define cell_type( c ) ( c->header & MASK_TYPE )
+#define operator_type( c ) ( c->header & MASK_OPERATOR )
+#define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
+#define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
+
+#define is_true  != null
+#define is_false == null
 
 struct _cell;
 typedef struct _cell cell;
@@ -112,7 +117,7 @@ static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CEL
 
 static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
 
-static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) != null ) ? null : null->size; }
+static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) is_true ) ? null : null->size; }
 
 static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
 
@@ -129,7 +134,7 @@ static cell * cons( cell * null, cell * a, cell * b )
 
 static cell * equals( cell * null, cell * a, cell * b )
 {
-	if( ( is_atom( null, a ) != null ) && ( is_atom( null, b ) != null ) )
+	if( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
 	{
 		return ( a->header == b->header ) ? null->size : null;
 	}
@@ -141,13 +146,13 @@ static cell * equals( cell * null, cell * a, cell * b )
 
 static cell * assq( cell * null, cell * key, cell * alist )
 {
-	if( is_null( null, alist ) != null )
+	if( is_null( null, alist ) is_true )
 	{
 		return null;
 	}
 	else
 	{
-		if( equals( null, key, car( null, car( null, alist ) ) ) != null )
+		if( equals( null, key, car( null, car( null, alist ) ) ) is_true )
 		{
 			return car( null, alist );
 		}
@@ -180,11 +185,11 @@ static cell * print_integer( cell * null, cell * exp )
 	unsigned long i;
 	put_char( '0' ); put_char( 'x' );
 	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
-	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
 	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
-	i += ( i > 0x09 ) ? 0x57 : 0x30; 
+	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
 	return exp;
@@ -193,25 +198,66 @@ static cell * print_integer( cell * null, cell * exp )
 static cell * print( cell * null, cell * exp );
 cell * print_list( cell * null, cell * lst )
 {
-	put_char( '(' );
+	cell * c = lst;
+	cell * queue = null;
 	while( 1 )
 	{
-		print( null, lst->car );
+		queue = cons( null, c, queue );
+		if( is_tuple( null, c ) is_true ) c = c->cdr; else break;
+	}
 
-		if( lst->cdr == null )
+	if( is_null( null, queue->car ) is_true )
+	{
+		put_char( '(' );
+		c = lst;
+		while( 1 )
 		{
-			put_char( ')' );
-			break;
+			print( null, c->car );
+
+			if( is_null( null, c->cdr ) is_true )
+			{
+				put_char( ')' );
+				break;
+			}
+			else
+			{
+				put_char( ' ' );
+				c = c->cdr;
+			}
 		}
-		lst = lst->cdr;
-		if( is_tuple( null, lst ) == null )
+	}
+	else
+	{
+		queue = reverse( null, queue );
+		c = queue;
+		int depth = 0;
+		while( 1 )
 		{
-			put_char( ' ' ); put_char( '.' ); put_char( ' ' );
-			print( null, lst->cdr );
-			put_char( ')' );
-			break;
+			if( is_null( null, c ) is_true )
+			{
+				break;
+			}
+			else
+			{
+				if( is_tuple( null, c->car ) is_true )
+				{
+					put_char( '(' ); put_char( '.' ); put_char( ' ' );
+					depth++;
+					print( null, c->car->car );
+					put_char( ' ' );
+				}
+				else
+				{
+					print( null, c->car );
+				}
+				c = c->cdr;
+			}
 		}
-		put_char( ' ' );
+		while( depth > 0 )
+		{
+			put_char( ')');
+			depth--;
+		}
 	}
 	return lst;
 }
@@ -239,36 +285,36 @@ static cell * print( cell * null, cell * exp )
 static cell * read_integer( cell * null )
 {
 	unsigned char c = get_char( );
-	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9
+	if( ( c >= '0' ) && ( c <= '9' ) )
 	{
-		c -= 0x30;
+		c -= '0';
 	}
 	else
 	{	
-		if( ( c >= 0x61 ) && ( c <= 0x66 ) ) // a - f
+		if( ( c >= 'a' ) && ( c <= 'f' ) )
 		{
-			c -= 0x57;
+			c -= ( 'a' - 10 );
 		}
 		else
 		{
 			halt( 3 );
 		}
 	}
-	c = c * 0x10;
+	c = c << 4;
 	unsigned char d = get_char( );
-	if( ( d >= 0x30 ) && ( d <= 0x39 ) ) // 0 - 9
+	if( ( d >= '0' ) && ( d <= '9' ) )
 	{
-		d -= 0x30;
+		d -= '0';
 	}
 	else
 	{	
-		if( ( d >= 0x61 ) && ( d <= 0x66 ) ) // a - f
+		if( ( d >= 'a' ) && ( d <= 'f' ) )
 		{
-			d -= 0x57;
+			d -= ( 'a' - 10 );
 		}
 	}
 	c += d;
-	return integer( null, c );
+	return integer( null, (unsigned char) c );
 }
 
 static cell * read( cell * null );
@@ -312,7 +358,7 @@ static cell * read( cell * null )
 			halt( 3 );
 		}
 	}
-	if( ( c >= 0x30 ) && ( c <= 0x39 ) ) // 0 - 9 sans 0x prefix
+	if( ( c >= '0' ) && ( c <= '9' ) ) // 0 - 9 sans 0x prefix
 	{
 		halt( 3 );
 	}
@@ -324,7 +370,7 @@ static cell * read( cell * null )
 	{
 		return symbol( null, c );
 	}
-	if( ( c >= 0x21 ) && ( c <= 0x7e ) ) // printable
+	if( ( c >= '!' ) && ( c <= '~' ) ) // printable
 	{
 		return symbol( null, c );
 	}
