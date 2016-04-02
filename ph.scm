@@ -1,8 +1,5 @@
 ;;; pre-history
 
-;;; (~E) (not e)
-(!~(^(E)(?E()0x00)))
-
 ;;; (v)	= (environment)
 (!v($(EV)V))
 
@@ -10,17 +7,33 @@
 (!'($(EV)(#E)))
 
 ;;; (kEFGH…) (list e f g h …)
-(!k($(EV)(uEV)))
+(!k($(EV)(oEV)))
 
-;;; (aXY) (append X Y)
-(!a(^(XY)(?X(.(#X)(a(%X)Y))Y)))
+;;; (,XY) (append X Y)
+(!,(^(XY)(?X(.(#X)(,(%X)Y))Y)))
 
 ;;; (mFL) (map f l)
 (!m(^(FL)(?L(.(F(#L))(mF(%L)))())))
 
-;;; (bEFGH…) (begin e f g h …)
-(!b($(EV)(e(k(a(k('^)())E)))))
+;;; (fFXL) (fold f x l)
+(!f(^(FXL)(?L(fF(F(#L)X)(%L))X)))
 
-;;; (let)
-(!l($(EV)(e(.(a(k('^)(m#(#E)))(%E))(m#(m%(#E)))))))
+;;; (:XL) (memq? x l)
+(!:(^(XL)(?L(?(=X(#L))L(:X(%L)))())))
+
+;;; (bEFGH…) (begin e f g h …)
+(!b($(EV)(e(k(,(k('^)())E)))))
+
+;;; (l) and named let
+(!l($(EV)
+     (? (s(#E))
+	(e(k(,(k('^)(k(#E)))(k(.(#E)(m#(m%(#(%E)))))))
+	    (,(k('^)(m#(#(%E))))(%(%E)))))
+	(e(.(,(k('^)(m#(#E)))(%E))(m#(m%(#E))))))))
+
+;;; (~E) (not e)
+(!~(^(E)(?E()0x00)))
+
+;;; (|XYZ…) (or z y z …)
+
 
