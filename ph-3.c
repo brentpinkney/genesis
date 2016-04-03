@@ -33,7 +33,6 @@ int verbose = 1;
 #define is_true  != null
 #define is_false == null
 
-struct _cell;
 typedef struct _cell cell;
 struct _cell
 {
@@ -124,8 +123,6 @@ unsigned char get_char( )
 }
 
 // procedures…
-static cell * quit( cell * null, cell * n ) { halt( integer_value( n ) ); return n; }
-
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
