@@ -16,7 +16,6 @@ int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c ) ( c->header & MASK_TYPE )
 
-struct _cell;
 typedef struct _cell cell;
 struct _cell
 {

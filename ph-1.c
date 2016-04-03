@@ -19,7 +19,6 @@ int verbose = 1;
 #define is_true  != null
 #define is_false == null
 
-struct _cell;
 typedef struct _cell cell;
 struct _cell
 {
