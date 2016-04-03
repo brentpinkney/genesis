@@ -230,7 +230,7 @@ static cell * print_integer( cell * null, cell * exp )
 }
 
 static cell * print( cell * null, cell * exp );
-cell * print_list( cell * null, cell * lst )
+static cell * print_list( cell * null, cell * lst )
 {
 	cell * c = lst;
 	cell * queue = null;
