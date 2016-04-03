@@ -26,9 +26,9 @@
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c ) ( c->header & MASK_TYPE )
-#define operator_type( c ) ( c->header & MASK_OPERATOR )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
+#define operator_type( c ) ( c->header & MASK_OPERATOR )
 
 #define is_true  != null
 #define is_false == null

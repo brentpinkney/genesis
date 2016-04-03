@@ -13,15 +13,16 @@
 #define CELL_INTEGER		0x04
 #define MASK_TYPE		0x07
 #define MASK_SYMBOL		0xff00
+#define MASK_INTEGER		0xff00
 #define MASK_INTEGER_HI		0xf000
 #define MASK_INTEGER_LO		0x0f00
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c ) ( c->header & MASK_TYPE )
-#define operator_type( c ) ( c->header & MASK_OPERATOR )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
+#define operator_type( c ) ( c->header & MASK_OPERATOR )
 
 #define is_true  != null
 #define is_false == null
@@ -375,6 +376,7 @@ static cell * read( cell * null )
 	}
 	
 	halt( 2 );
+	return null;
 }
 
 static cell * repl( cell * null, cell * env )

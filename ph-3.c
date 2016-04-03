@@ -1,5 +1,5 @@
 //
-// Pre-history 3: add eval.
+// Pre-history 3: add eval, no procedures from the REPL yet."
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,9 +26,9 @@
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c ) ( c->header & MASK_TYPE )
-#define operator_type( c ) ( c->header & MASK_OPERATOR )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
+#define operator_type( c ) ( c->header & MASK_OPERATOR )
 
 #define is_true  != null
 #define is_false == null
@@ -102,15 +102,9 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
-// static cell * function( cell * null, cell * exp ) { halt( 99 ); return null; }
+// static cell * function( cell * null, cell * exp )
 
-static cell * procedure( cell * null, unsigned long nargs, void * bytes )
-{
-	cell * p = allocate( null, 2 );
-	p->header = ( nargs << 8 ) + CELL_PROCEDURE;	
-	p->bytes  = bytes;
-	return p;
-}
+// static cell * procedure( cell * null, unsigned long nargs, void * bytes )
 
 unsigned char put_char( unsigned char c )
 {

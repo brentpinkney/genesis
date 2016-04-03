@@ -76,7 +76,7 @@ static cell * sire( )
 
 int main( )
 {
-	cell * null = sire( );
+	sire( );
 	halt( 0 );
 	return 0;
 }
