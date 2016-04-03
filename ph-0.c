@@ -50,10 +50,7 @@ static cell * sire( )
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
-	if( arena == MAP_FAILED )
-	{
-		halt( 1 );
-	}
+	if( arena == MAP_FAILED ) halt( 1 );
 
 	// build null by hand…
 	cell * null  = arena;

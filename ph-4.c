@@ -68,10 +68,7 @@ static cell * sire( )
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
-	if( arena == MAP_FAILED )
-	{
-		halt( 1 );
-	}
+	if( arena == MAP_FAILED ) halt( 1 );
 
 	// build null by hand…
 	cell * null  = arena;
@@ -82,9 +79,7 @@ static cell * sire( )
 	// make the size integer by hand (useful as 'not null')…
 	cell * size  = allocate( null, 1 );
 	size->header = ( bytes << 8 ) + CELL_INTEGER;
-
 	null->size = size;
-
 	return null;
 }
 
@@ -101,8 +96,6 @@ static cell * integer( cell * null, unsigned char n )
 	i->header = ( n << 8 ) + CELL_INTEGER;
 	return i;
 }
-
-// static cell * function( cell * null, cell * exp ) { halt( 99 ); return null; }
 
 static cell * procedure( cell * null, unsigned long nargs, void * bytes )
 {
@@ -168,33 +161,22 @@ static cell * fexpr( cell * null, cell * exp )
 
 static cell * equals( cell * null, cell * a, cell * b )
 {
-	if( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
-	{
-		return ( a->header == b->header ) ? null->size : null;
-	}
-	else
-	{
-		return ( a == b ) ? null->size : null;
-	}
+	return ( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
+		? ( a->header == b->header )
+			? null->size
+			: null
+		: ( a == b )
+			? null->size
+			: null;
 }
 
 static cell * assq( cell * null, cell * key, cell * alist )
 {
-	if( is_null( null, alist ) is_true )
-	{
-		return null;
-	}
-	else
-	{
-		if( equals( null, key, car( null, car( null, alist ) ) ) is_true )
-		{
-			return car( null, alist );
-		}
-		else
-		{
-			return assq( null, key, cdr( null, alist ) );
-		}
-	}
+	return ( alist == null )
+		? null
+		: ( equals( null, key, alist->car->car ) is_true )
+			? alist->car
+			: assq( null, key, alist->cdr );
 }
 
 static cell * reverse( cell * null, cell * lst )
@@ -240,7 +222,7 @@ static cell * print_list( cell * null, cell * lst )
 		if( is_tuple( null, c ) is_true ) c = c->cdr; else break;
 	}
 
-	if( is_null( null, queue->car ) is_true )
+	if( queue->car == null )
 	{
 		put_char( '(' );
 		c = lst;
@@ -248,7 +230,7 @@ static cell * print_list( cell * null, cell * lst )
 		{
 			print( null, c->car );
 
-			if( is_null( null, c->cdr ) is_true )
+			if( c->cdr == null )
 			{
 				put_char( ')' );
 				break;
@@ -267,7 +249,7 @@ static cell * print_list( cell * null, cell * lst )
 		int depth = 0;
 		while( 1 )
 		{
-			if( is_null( null, c ) is_true )
+			if( c == null )
 			{
 				break;
 			}
@@ -289,7 +271,7 @@ static cell * print_list( cell * null, cell * lst )
 		}
 		while( depth > 0 )
 		{
-			put_char( ')');
+			put_char( ')' );
 			depth--;
 		}
 	}
@@ -370,8 +352,7 @@ static cell * read( cell * null );
 static cell * read_list( cell * null, cell * lst )
 {
 	cell * c = read( null );
-	if( ( cell_type( c ) == CELL_SYMBOL )
-	 && ( symbol_value( c ) == ')' ) )
+	if( ( cell_type( c ) == CELL_SYMBOL ) && ( symbol_value( c ) == ')' ) )
 	{
 		return reverse( null, lst );
 	}
@@ -435,8 +416,7 @@ static cell * apply_forms( cell * null, cell * formals, cell * args, cell * term
 	while( is_tuple( null, formals ) is_true )
 	{
 		cell * arg;
-		if( ( is_null( null, formals->cdr ) is_true )
-			&& ( is_null( null, args->cdr ) is_false ) )
+		if( ( formals->cdr == null ) && ( args->cdr != null ) )
 		{
 			arg = args;
 		}
@@ -610,7 +590,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						env = ans->cdr;
 
 						cell * tuple = assq( null, key, env );
-						if( is_null( null, tuple ) is_true )
+						if( tuple == null )
 						{
 							tuple = cons( null, key, val );
 							env = cons( null, tuple, env );
@@ -630,7 +610,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						cell * ans = eval( null, tst, env );
 						tst = ans->car;
 						env = ans->cdr;
-						if( is_null( null, tst ) is_true )
+						if( tst == null )
 						{
 							cell * ans = eval( null, alt, env );
 							return cons( null, ans->car, ans->cdr );

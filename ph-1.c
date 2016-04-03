@@ -59,10 +59,7 @@ static cell * sire( )
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
-	if( arena == MAP_FAILED )
-	{
-		halt( 1 );
-	}
+	if( arena == MAP_FAILED ) halt( 1 );
 
 	// build null by hand…
 	cell * null  = arena;
@@ -130,35 +127,22 @@ static cell * cons( cell * null, cell * a, cell * b )
 
 static cell * equals( cell * null, cell * a, cell * b )
 {
-	if( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
-	{
-		return ( a->header == b->header ) ? null->size : null;
-	}
-	else
-	{
-		return ( a == b ) ? null->size : null;
-	}
+	return ( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
+		? ( a->header == b->header )
+			? null->size
+			: null
+		: ( a == b )
+			? null->size
+			: null;
 }
 
 static cell * assq( cell * null, cell * key, cell * alist )
 {
-	if( is_null( null, alist ) is_true )
-	{
-		dprintf( "assq: not found\n" );
-		return null;
-	}
-	else
-	{
-		dprintf( "assq: caar(alist) = %016lx\n", car( null, car( null, alist ) )->header );
-		if( equals( null, key, car( null, car( null, alist ) ) ) is_true )
-		{
-			return car( null, alist );
-		}
-		else
-		{
-			return assq( null, key, cdr( null, alist ) );
-		}
-	}
+	return ( alist == null )
+		? null
+		: ( equals( null, key, alist->car->car ) is_true )
+			? alist->car
+			: assq( null, key, alist->cdr );
 }
 
 int main( )
@@ -207,4 +191,3 @@ int main( )
 
 	return 0;
 }
-
