@@ -1,5 +1,5 @@
 //
-// Pre-history 3: add eval, no procedures from the REPL yet."
+// Pre-history 3: add eval, no functions from the REPL yet."
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,8 +12,8 @@
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
 #define CELL_OPERATOR		0x05
-#define CELL_FUNCTION		0x05	// machine language, no REPL access
-#define CELL_PROCEDURE		0x15	// machine language, REPL access
+#define CELL_PROCEDURE		0x05	// machine language, REPL access
+#define CELL_FUNCTION		0x15	// machine language, no REPL access
 #define CELL_LAMBDA		0x25	// operative s-expressions
 #define CELL_FEXPR		0x35	// applicative s-expressions
 #define MASK_TYPE		0x07
@@ -46,7 +46,7 @@ struct _cell
 	};
 };
 
-// functions…
+// procedures…
 static void halt( unsigned long n )
 {
 	exit( n );
@@ -107,7 +107,7 @@ unsigned char get_char( )
 	return fgetc( stdin );
 }
 
-// procedures…
+// functions…
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
@@ -289,10 +289,10 @@ static cell * print( cell * null, cell * exp )
 		case CELL_OPERATOR:
 			switch( operator_type( exp ) )
 			{
-				case CELL_FUNCTION:
+				case CELL_PROCEDURE:
 					halt( 9 );
 					break;
-				case CELL_PROCEDURE:
+				case CELL_FUNCTION:
 					put_char( 'p' ); put_char( '0' + integer_value( exp ) );
 					break;
 				case CELL_LAMBDA:
@@ -447,8 +447,10 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 	dprintf( "apply: " ); print( null, op ); dprintf( " to " ); print( null, args ); put_char( '\n' );
 	switch( operator_type( op ) )
 	{
-		case CELL_FUNCTION:
 		case CELL_PROCEDURE:
+			halt( 8 );
+			break;
+		case CELL_FUNCTION:
 			halt( 8 );
 			break;
 		case CELL_LAMBDA:
@@ -461,7 +463,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			cell * body = op->operation->cdr->cdr;
 
 			ans = apply_forms( null, fmls, args, body, env );
-			return cons( null, ans->car, env );	// any set! will be lost on return
+			return cons( null, ans->car, env );			// any set! will be lost on return
 		}
 		case CELL_FEXPR:
 		{
@@ -483,7 +485,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 				terms = terms->cdr;
 			}
 
-			return cons( null, res, env );		// any set! will be lost on return
+			return cons( null, res, env );				// any set! will be lost on return
 		}
 	}
 	halt( 6 );

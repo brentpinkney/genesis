@@ -35,7 +35,7 @@ struct _cell
 	};
 };
 
-// functions…
+// procedures…
 static void halt( unsigned long n )
 {
 	dprintf( "halting…\n" );
@@ -96,7 +96,7 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
-// procedures…
+// functions…
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }

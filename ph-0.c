@@ -26,7 +26,7 @@ struct _cell
 	};
 };
 
-// functions…
+// procedures…
 static void halt( unsigned long n )
 {
 	dprintf( "halting…\n" );

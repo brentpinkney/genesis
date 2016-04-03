@@ -1,5 +1,5 @@
 //
-// Pre-history 4: Implement procedure calls (primitives) from the REPL.
+// Pre-history 4: Implement function calls (primitives) from the REPL.
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,8 +12,8 @@
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
 #define CELL_OPERATOR		0x05
-#define CELL_FUNCTION		0x05	// machine language, no REPL access
-#define CELL_PROCEDURE		0x15	// machine language, REPL access
+#define CELL_PROCEDURE		0x05	// machine language, REPL access
+#define CELL_FUNCTION		0x15	// machine language, no REPL access
 #define CELL_LAMBDA		0x25	// operative s-expressions
 #define CELL_FEXPR		0x35	// applicative s-expressions
 #define MASK_TYPE		0x07
@@ -46,7 +46,7 @@ struct _cell
 	};
 };
 
-// functions…
+// procedures…
 static void halt( unsigned long n )
 {
 	exit( n );
@@ -97,10 +97,10 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
-static cell * procedure( cell * null, unsigned long nargs, void * bytes )
+static cell * function( cell * null, unsigned long nargs, void * bytes )
 {
 	cell * p = allocate( null, 2 );
-	p->header = ( nargs << 8 ) + CELL_PROCEDURE;	
+	p->header = ( nargs << 8 ) + CELL_FUNCTION;
 	p->bytes  = bytes;
 	return p;
 }
@@ -115,7 +115,7 @@ unsigned char get_char( )
 	return fgetc( stdin );
 }
 
-// procedures…
+// functions…
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
@@ -297,10 +297,10 @@ static cell * print( cell * null, cell * exp )
 		case CELL_OPERATOR:
 			switch( operator_type( exp ) )
 			{
-				case CELL_FUNCTION:
+				case CELL_PROCEDURE:
 					halt( 9 );
 					break;
-				case CELL_PROCEDURE:
+				case CELL_FUNCTION:
 					put_char( 'p' ); put_char( '0' + integer_value( exp ) );
 					break;
 				case CELL_LAMBDA:
@@ -454,10 +454,10 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 	cell * ans;
 	switch( operator_type( op ) )
 	{
-		case CELL_FUNCTION:
+		case CELL_PROCEDURE:
 			halt( 8 );
 			break;
-		case CELL_PROCEDURE:
+		case CELL_FUNCTION:
 		{
 			int evaluated = 0;
 			if( op->bytes == eval )
@@ -515,9 +515,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 				default:
 					halt( 7 );
 			}
-			return evaluated
-				? ans
-				: cons( null, ans, env );	// any set! will be lost on return
+			return evaluated ? ans : cons( null, ans, env );	// any set! will be lost on return
 		}
 		case CELL_LAMBDA:
 		{
@@ -528,7 +526,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			cell * body = op->operation->cdr->cdr;
 
 			ans = apply_forms( null, fmls, args, body, env );
-			return cons( null, ans->car, env );	// any set! will be lost on return
+			return cons( null, ans->car, env );			// any set! will be lost on return
 		}
 		case CELL_FEXPR:
 		{
@@ -549,7 +547,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 				terms = terms->cdr;
 			}
 
-			return cons( null, res, env );		// any set! will be lost on return
+			return cons( null, res, env );				// any set! will be lost on return
 		}
 	}
 	halt( 6 );
@@ -663,31 +661,31 @@ int main( )
 	cell * null = sire( );
 	cell * env  = null;
 
-	env = cons( null, cons( null, symbol( null, '#'  ), procedure( null, 1, car           ) ), env );
-	env = cons( null, cons( null, symbol( null, '%'  ), procedure( null, 1, cdr           ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x00 ), procedure( null, 2, set_car       ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x01 ), procedure( null, 2, set_cdr       ) ), env );
-	env = cons( null, cons( null, symbol( null, '_'  ), procedure( null, 1, is_null       ) ), env );
-	env = cons( null, cons( null, symbol( null, 't'  ), procedure( null, 1, is_tuple      ) ), env );
-	env = cons( null, cons( null, symbol( null, 'a'  ), procedure( null, 1, is_atom       ) ), env );
-	env = cons( null, cons( null, symbol( null, 's'  ), procedure( null, 1, is_symbol     ) ), env );
-	env = cons( null, cons( null, symbol( null, 'i'  ), procedure( null, 1, is_integer    ) ), env );
-	env = cons( null, cons( null, symbol( null, '.'  ), procedure( null, 2, cons          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x02 ), procedure( null, 1, lambda        ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x03 ), procedure( null, 1, fexpr         ) ), env );
-	env = cons( null, cons( null, symbol( null, '='  ), procedure( null, 2, equals        ) ), env );
-	env = cons( null, cons( null, symbol( null, 'q'  ), procedure( null, 2, assq          ) ), env );
-	env = cons( null, cons( null, symbol( null, '\\' ), procedure( null, 1, reverse       ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x04 ), procedure( null, 1, print_integer ) ), env );
-	env = cons( null, cons( null, symbol( null, 'p'  ), procedure( null, 1, print         ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x05 ), procedure( null, 1, read_integer  ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x06 ), procedure( null, 1, read_list     ) ), env );
-	env = cons( null, cons( null, symbol( null, 'r'  ), procedure( null, 0, read          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x07 ), procedure( null, 4, apply_forms   ) ), env );
-	env = cons( null, cons( null, symbol( null, 'd'  ), procedure( null, 3, apply         ) ), env ); // do…
-	env = cons( null, cons( null, symbol( null, 'o'  ), procedure( null, 2, eval_list     ) ), env ); // over…
-	env = cons( null, cons( null, symbol( null, 'e'  ), procedure( null, 1, eval          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x08 ), procedure( null, 1, repl          ) ), env );
+	env = cons( null, cons( null, symbol( null, '#'  ), function( null, 1, car           ) ), env );
+	env = cons( null, cons( null, symbol( null, '%'  ), function( null, 1, cdr           ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x00 ), function( null, 2, set_car       ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x01 ), function( null, 2, set_cdr       ) ), env );
+	env = cons( null, cons( null, symbol( null, '_'  ), function( null, 1, is_null       ) ), env );
+	env = cons( null, cons( null, symbol( null, 't'  ), function( null, 1, is_tuple      ) ), env );
+	env = cons( null, cons( null, symbol( null, 'a'  ), function( null, 1, is_atom       ) ), env );
+	env = cons( null, cons( null, symbol( null, 's'  ), function( null, 1, is_symbol     ) ), env );
+	env = cons( null, cons( null, symbol( null, 'i'  ), function( null, 1, is_integer    ) ), env );
+	env = cons( null, cons( null, symbol( null, '.'  ), function( null, 2, cons          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x02 ), function( null, 1, lambda        ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x03 ), function( null, 1, fexpr         ) ), env );
+	env = cons( null, cons( null, symbol( null, '='  ), function( null, 2, equals        ) ), env );
+	env = cons( null, cons( null, symbol( null, 'q'  ), function( null, 2, assq          ) ), env );
+	env = cons( null, cons( null, symbol( null, '\\' ), function( null, 1, reverse       ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x04 ), function( null, 1, print_integer ) ), env );
+	env = cons( null, cons( null, symbol( null, 'p'  ), function( null, 1, print         ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x05 ), function( null, 1, read_integer  ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x06 ), function( null, 1, read_list     ) ), env );
+	env = cons( null, cons( null, symbol( null, 'r'  ), function( null, 0, read          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x07 ), function( null, 4, apply_forms   ) ), env );
+	env = cons( null, cons( null, symbol( null, 'd'  ), function( null, 3, apply         ) ), env ); // do…
+	env = cons( null, cons( null, symbol( null, 'o'  ), function( null, 2, eval_list     ) ), env ); // over…
+	env = cons( null, cons( null, symbol( null, 'e'  ), function( null, 1, eval          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x08 ), function( null, 1, repl          ) ), env );
 
 	repl( null, env );
 	return 0;

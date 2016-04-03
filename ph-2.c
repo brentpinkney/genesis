@@ -38,7 +38,7 @@ struct _cell
 	};
 };
 
-// functions…
+// procedures…
 static void halt( unsigned long n )
 {
 	exit( n );
@@ -99,7 +99,7 @@ unsigned char get_char( )
 	return fgetc( stdin );
 }
 
-// procedures…
+// functions…
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
