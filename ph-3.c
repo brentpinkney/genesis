@@ -97,12 +97,12 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
-unsigned char put_char( unsigned char c )
+static unsigned char put_char( unsigned char c )
 {
 	return fputc( c, stdout );
 }
 
-unsigned char get_char( )
+static unsigned char get_char( )
 {
 	return fgetc( stdin );
 }
