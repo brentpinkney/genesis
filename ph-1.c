@@ -109,8 +109,6 @@ static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CEL
 
 static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
 
-static cell * is_atom( cell * null, cell * c ) { return ( is_tuple( null, c ) is_true ) ? null : null->size; }
-
 static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
 
 static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->size : null; }
@@ -127,13 +125,9 @@ static cell * cons( cell * null, cell * a, cell * b )
 
 static cell * equals( cell * null, cell * a, cell * b )
 {
-	return ( ( is_atom( null, a ) is_true ) && ( is_atom( null, b ) is_true ) )
-		? ( a->header == b->header )
-			? null->size
-			: null
-		: ( a == b )
-			? null->size
-			: null;
+	return ( ( is_tuple( null, a ) is_true ) || ( is_tuple( null, b ) is_true ) )
+		? ( a == b ) ? null->size : null
+		: ( a->header == b->header ) ? null->size : null;
 }
 
 static cell * assq( cell * null, cell * key, cell * alist )

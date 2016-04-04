@@ -4,6 +4,9 @@
 ;;; ('E) (quote e)
 (!'($(EV)(#E)))
 
+;;; (aE) (atom? e)
+(!a(^(E)(?E(?(tE)()E)())))
+
 ;;; (kEFGH…) (list e f g h …)
 (!k($(EV)(oEV)))
 
