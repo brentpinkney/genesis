@@ -48,8 +48,9 @@ struct _cell
 };
 
 // procedures…
-static void halt( unsigned long n )
+static void quit( unsigned long n )
 {
+	printf( "quit: n = %02lx\n", n );
 	exit( n );
 }
 
@@ -60,6 +61,7 @@ static cell * allocate( cell * null, unsigned long words )
 	return this;
 }
 
+static cell * integer( cell * null, unsigned char n );
 static cell * sire( )
 {
 	unsigned long bytes = PAGE_SIZE * 1024;
@@ -69,7 +71,7 @@ static cell * sire( )
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
-	if( arena == MAP_FAILED ) halt( 1 );
+	if( arena == MAP_FAILED ) quit( 1 );
 
 	// build null by hand…
 	cell * null  = arena;
@@ -77,10 +79,9 @@ static cell * sire( )
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
 
-	// make the size integer by hand (useful as 'not null')…
-	cell * size  = allocate( null, 1 );
-	size->header = ( bytes << 8 ) + CELL_INTEGER;
-	null->size = size;
+	// make the size integer (useful as 'not null')…
+	cell * size = integer( null, bytes );
+	null->size  = size;
 	return null;
 }
 
@@ -126,17 +127,42 @@ static cell * code( cell * null, unsigned char type, unsigned long nargs, void *
 	return f;
 }
 
-static unsigned char put_char( unsigned char c )
+static cell * expression( cell * null, unsigned char type, cell * exp )
 {
-	return fputc( c, stdout );
+	cell * i = allocate( null, 2 );
+	i->header = type;
+	i->operation = exp;
+	return i;
 }
 
-static unsigned char get_char( )
+static unsigned char get_char( ) { return fgetc( stdin ); }
+
+static unsigned char put_char( unsigned char c ) { return fputc( c, stdout ); }
+
+static void toggle_writable( void * address, int writable )
 {
-	return fgetc( stdin );
+	address -= (unsigned long) address % PAGE_SIZE;
+	int flag = writable? PROT_WRITE : 0;
+	if( mprotect( address, PAGE_SIZE, PROT_READ | PROT_EXEC | flag ) == -1 )
+	{
+		quit( 1 );
+	}
 }
 
 // functions…
+static cell * halt( cell * null, cell * n )					// XXX
+{
+	printf( "halt:\n" );
+	quit( integer_value( n ) );
+	return n;
+}
+
+static cell * haltXXX( cell * null, cell * n )					// XXX
+{
+	printf( "haltXXX:\n" );
+	return halt( null, n );
+}
+
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
@@ -160,22 +186,6 @@ static cell * cons( cell * null, cell * a, cell * b )
 	t->car = a;
 	t->cdr = b;
 	return t;
-}
-
-static cell * lambda( cell * null, cell * exp )
-{
-	cell * i = allocate( null, 2 );
-	i->header = CELL_LAMBDA;
-	i->operation = exp;
-	return i;
-}
-
-static cell * fexpr( cell * null, cell * exp )
-{
-	cell * i = allocate( null, 2 );
-	i->header = CELL_FEXPR;
-	i->operation = exp;
-	return i;
 }
 
 static cell * equals( cell * null, cell * a, cell * b )
@@ -354,7 +364,7 @@ static cell * read_integer( cell * null )
 		}
 		else
 		{
-			halt( 3 );
+			quit( 3 );
 		}
 	}
 	c = c << 4;
@@ -411,12 +421,12 @@ static cell * read( cell * null )
 		}
 		else
 		{
-			halt( 3 );
+			quit( 3 );
 		}
 	}
 	if( ( c >= '0' ) && ( c <= '9' ) ) // 0 - 9 sans 0x prefix
 	{
-		halt( 3 );
+		quit( 3 );
 	}
 	if( c == '(' )
 	{
@@ -431,7 +441,7 @@ static cell * read( cell * null )
 		return symbol( null, c );
 	}
 	
-	halt( 2 );
+	quit( 2 );
 	return null;
 }
 
@@ -481,7 +491,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 	switch( operator_type( op ) )
 	{
 		case CELL_PROCEDURE:
-			halt( 8 );
+			quit( 8 );
 			break;
 		case CELL_FUNCTION:
 		{
@@ -539,7 +549,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 					break;
 				}
 				default:
-					halt( 7 );
+					quit( 7 );
 			}
 			return evaluated ? ans : cons( null, ans, env );	// any set! will be lost on return
 		}
@@ -576,7 +586,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			return cons( null, res, env );				// any set! will be lost on return
 		}
 	}
-	halt( 6 );
+	quit( 6 );
 	return null;
 }
 
@@ -593,7 +603,8 @@ static cell * eval_list( cell * null, cell * lst, cell * env )
 	return cons( null, reverse( null, res ), env );
 }
 
-static cell * link( cell * null, cell * exp, cell * env );			// XXX
+static cell * link_callees( cell * null, cell * exp, cell * env );			// XXX
+static cell * link_callers( cell * null, cell * key, cell * exp, cell * env );		// XXX
 static cell * eval( cell * null, cell * exp, cell * env )
 {
 	switch( cell_type( exp ) )
@@ -613,6 +624,11 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						cell * ans = eval( null, exp->cdr->cdr->car, env );
 						cell * val = ans->car;
 						env = ans->cdr;
+
+						if( ( cell_type( val ) == CELL_PROCEDURE ) || ( cell_type( val ) == CELL_FUNCTION ) )
+						{
+							link_callers( null, key, val, env );
+						}	
 
 						cell * tuple = assq( null, key, env );
 						if( tuple == null )
@@ -648,11 +664,11 @@ static cell * eval( cell * null, cell * exp, cell * env )
 					}
 					case '^':
 					{
-						return cons( null, lambda( null, exp ), env );
+						return cons( null, expression( null, CELL_LAMBDA, exp ), env );
 					}
 					case '$':
 					{
-						return cons( null, fexpr( null, exp ), env );
+						return cons( null, expression( null, CELL_FEXPR, exp ), env );
 					}
 					case '@':
 					{
@@ -668,10 +684,10 @@ static cell * eval( cell * null, cell * exp, cell * env )
 						if( ( type == CELL_PROCEDURE ) || ( type == CELL_FUNCTION ) )
 						{
 							ans = code( null, type, nargs, 0, bytes );
-							ans = link( null, ans, env );
+							ans = link_callees( null, ans, env );
 							return cons( null, ans, env );
 						}
-						halt( 4 );
+						quit( 4 );
 					}
 				}
 			}
@@ -688,7 +704,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 		case CELL_INTEGER:
 			return cons( null, exp, env );
 	}
-	halt( 4 );
+	quit( 4 );
 	return null;
 }
 
@@ -769,9 +785,9 @@ static cell * describe( cell * null, cell * exp )
 	return exp;
 }
 
-static cell * link( cell * null, cell * exp, cell * env )
+static cell * link_callees( cell * null, cell * exp, cell * env )
 {
-	dprintf( "link\n" );
+	dprintf( "link_callees:\n" );
 	if( exp->address >= null->arena )
 	{
 		unsigned long words = ( exp->header >> 16 ) - 2;
@@ -779,12 +795,11 @@ static cell * link( cell * null, cell * exp, cell * env )
 		for( unsigned long i = 0; i < bytes; )
 		{
 			unsigned char * b = exp->bytes + i;
-			if( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&
-			    ( *( b + 03 ) == 0x00 ) && ( *( b + 04 ) == 0x00 ) &&
-			    ( *( b + 05 ) == 0x00 ) && ( *( b + 06 ) == 0x00 ) &&
-			    ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ))
+			if( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&				// movabs R10,…
+			    ( *( b + 03 ) == 0x00 ) && ( *( b + 04 ) == 0x00 ) &&				// unlinked
+			    ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) )	// call R10
 			{
-				dprintf( "LINK [%02x → ", *( b + 2) );
+				dprintf( "[0x%02x → ", *( b + 2) );
 				cell * tuple = assq( null, symbol( null, *( b + 2 ) ), env );
 				if( tuple != null )
 				{
@@ -794,7 +809,7 @@ static cell * link( cell * null, cell * exp, cell * env )
 				else
 				{
 					dprintf( "FAIL ]" );
-					halt( 5 );
+					quit( 5 );
 				}
 			}
 			printf( "%02x ", *b );
@@ -805,12 +820,56 @@ static cell * link( cell * null, cell * exp, cell * env )
 	return exp;
 }
 
+static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
+{
+	dprintf( "link_callers: to '%c' at %p\n", (int) symbol_value( key ), exp->address );
+	cell * existing = assq( null, key, env );
+	if( existing != null )
+	{
+		dprintf( "link_callers: existing at %p\n", existing->cdr->address );
+		while( env != null )
+		{
+			cell * tuple = env->car;
+			cell * code  = tuple->cdr;
+			if( ( cell_type( code ) == CELL_PROCEDURE ) || ( cell_type( code ) == CELL_FUNCTION ) )
+			{
+				unsigned char * b = code->address;
+				while( *b != 0xc3 ) // ret
+				{
+					if( ( ( *( b + 00 ) == 0x48 ) && ( *( b + 01 ) == 0xb8 ) &&	// movabs rax,…
+					      ( *( b + 10 ) == 0xff ) && ( *( b + 11 ) == 0xd0 ) )	// call   rax
+					 || ( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&	// movabs r10,…
+					      ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) ) ) // call R10
+					{
+						void * p;
+						memcpy( &p, b + 2, WORD_SIZE );
+						if( p == existing->cdr->address )
+						{
+							unsigned long s = symbol_value( tuple->car );
+							dprintf( "link_callers: re-linking '%c' (%ld) %p → %p\n",
+								(int) s, s,
+								p, exp->address );
+							toggle_writable( code->address, 1 );
+							memcpy( b + 2, &( exp->address ), WORD_SIZE );
+							toggle_writable( code->address, 0 );
+						}
+					}
+					b++;
+				}
+			}
+			env = env->cdr;
+		}
+	}
+	return exp;
+}
+
 int main( )
 {
 	cell * null = sire( );
 	cell * env  = null;
 
 	// functions…
+	env = cons( null, cons( null, symbol( null, 'h'  ), code( null, CELL_FUNCTION,  1, halt          , 0 ) ), env ); // XXX
 	env = cons( null, cons( null, symbol( null, '#'  ), code( null, CELL_FUNCTION,  1, car           , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '%'  ), code( null, CELL_FUNCTION,  1, cdr           , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x00 ), code( null, CELL_FUNCTION,  2, set_car       , 0 ) ), env );
@@ -820,34 +879,38 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 's'  ), code( null, CELL_FUNCTION,  1, is_symbol     , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'i'  ), code( null, CELL_FUNCTION,  1, is_integer    , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '.'  ), code( null, CELL_FUNCTION,  2, cons          , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x02 ), code( null, CELL_FUNCTION,  1, lambda        , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x03 ), code( null, CELL_FUNCTION,  1, fexpr         , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '='  ), code( null, CELL_FUNCTION,  2, equals        , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'q'  ), code( null, CELL_FUNCTION,  2, assq          , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '\\' ), code( null, CELL_FUNCTION,  1, reverse       , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'z'  ), code( null, CELL_FUNCTION,  1, length        , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x04 ), code( null, CELL_FUNCTION,  1, print_integer , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x03 ), code( null, CELL_FUNCTION,  1, print_integer , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'p'  ), code( null, CELL_FUNCTION,  1, print         , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x05 ), code( null, CELL_FUNCTION,  1, read_integer  , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x06 ), code( null, CELL_FUNCTION,  1, read_list     , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x04 ), code( null, CELL_FUNCTION,  1, read_integer  , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x05 ), code( null, CELL_FUNCTION,  1, read_list     , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'r'  ), code( null, CELL_FUNCTION,  0, read          , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x07 ), code( null, CELL_FUNCTION,  4, apply_forms   , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x06 ), code( null, CELL_FUNCTION,  4, apply_forms   , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '`'  ), code( null, CELL_FUNCTION,  3, apply         , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'o'  ), code( null, CELL_FUNCTION,  2, eval_list     , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'e'  ), code( null, CELL_FUNCTION,  1, eval          , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'd'  ), code( null, CELL_FUNCTION,  1, describe      , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x08 ), code( null, CELL_FUNCTION,  2, link          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x07 ), code( null, CELL_FUNCTION,  2, link_callees  , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x08 ), code( null, CELL_FUNCTION,  2, link_callers  , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x09 ), code( null, CELL_FUNCTION,  1, repl          , 0 ) ), env );
 
+	// XXX
+	env = cons( null, cons( null, symbol( null, 'g'  ), code( null, CELL_FUNCTION,  1, haltXXX       , 0 ) ), env );
+
 	// procedures…
-	env = cons( null, cons( null, symbol( null, 0xff ), code( null, CELL_PROCEDURE, 1, halt          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0xff ), code( null, CELL_PROCEDURE, 1, quit          , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xfe ), code( null, CELL_PROCEDURE, 2, allocate      , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xfd ), code( null, CELL_PROCEDURE, 0, sire          , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xfc ), code( null, CELL_PROCEDURE, 2, symbol        , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xfb ), code( null, CELL_PROCEDURE, 2, integer       , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xfa ), code( null, CELL_PROCEDURE, 5, code          , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0xf9 ), code( null, CELL_PROCEDURE, 1, put_char      , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0xf9 ), code( null, CELL_PROCEDURE, 3, expression    , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf8 ), code( null, CELL_PROCEDURE, 0, get_char      , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0xf7 ), code( null, CELL_PROCEDURE, 1, put_char      , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0xf6 ), code( null, CELL_PROCEDURE, 0, main          , 0 ) ), env );
 
 	repl( null, env );
 	return 0;
