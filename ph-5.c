@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 
 #define PAGE_SIZE		4096
+#define NUM_PAGES		1024
 #define WORD_SIZE		8
 #define CELL_NULL		0x01
 #define CELL_TUPLE		0x02
@@ -61,10 +62,9 @@ static cell * allocate( cell * null, unsigned long words )
 	return this;
 }
 
-static cell * integer( cell * null, unsigned char n );
-static cell * sire( )
+static cell * sire( unsigned long pages )
 {
-	unsigned long bytes = PAGE_SIZE * 1024;
+	unsigned long bytes = PAGE_SIZE * pages;
 	void * arena = mmap(
 			0,
 			bytes,
@@ -80,8 +80,9 @@ static cell * sire( )
 	null->next   = arena + ( 4 * WORD_SIZE );
 
 	// make the size integer (useful as 'not null')…
-	cell * size = integer( null, bytes );
-	null->size  = size;
+	cell * size  = allocate( null, 1 );
+	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	null->size   = size;
 	return null;
 }
 
@@ -726,7 +727,8 @@ static cell * describe( cell * null, cell * exp )
 		case CELL_NULL:
 		{
 			unsigned long size = exp->size->header >> 8;
-			printf( "null\nsize:      0x%08lx\t\tarena:%16p\t\tnext:%16p\n", size, exp->arena, exp->next );
+			printf( "null\nsize:      0x%08lx\t\tarena:%16p\t\tnext:%16p", size, exp->arena, exp->next );
+			printf( "\tused: %.2f%%\n", ( exp->next - exp->arena ) * 100.0 / size );
 			break;
 		}
 		case CELL_TUPLE:
@@ -865,7 +867,7 @@ static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 
 int main( )
 {
-	cell * null = sire( );
+	cell * null = sire( NUM_PAGES );
 	cell * env  = null;
 
 	// functions…
