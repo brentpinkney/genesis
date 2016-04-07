@@ -49,10 +49,11 @@ struct _cell
 };
 
 // procedures…
-static void quit( unsigned long n )
-{
-	exit( n );
-}
+static void quit( unsigned long n ) { exit( n ); }
+
+static unsigned char get_char( ) { return fgetc( stdin ); }
+
+static unsigned char put_char( unsigned char c ) { return fputc( c, stdout ); }
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -132,10 +133,6 @@ static cell * expression( cell * null, unsigned char type, cell * exp )
 	i->operation = exp;
 	return i;
 }
-
-static unsigned char get_char( ) { return fgetc( stdin ); }
-
-static unsigned char put_char( unsigned char c ) { return fputc( c, stdout ); }
 
 static void toggle_writable( void * address, int writable )
 {
@@ -866,19 +863,19 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 'q'  ), code( null, CELL_FUNCTION,  2, assq          , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '\\' ), code( null, CELL_FUNCTION,  1, reverse       , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'z'  ), code( null, CELL_FUNCTION,  1, length        , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x03 ), code( null, CELL_FUNCTION,  1, print_integer , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x02 ), code( null, CELL_FUNCTION,  1, print_integer , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'p'  ), code( null, CELL_FUNCTION,  1, print         , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x04 ), code( null, CELL_FUNCTION,  1, read_integer  , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x05 ), code( null, CELL_FUNCTION,  1, read_list     , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x03 ), code( null, CELL_FUNCTION,  1, read_integer  , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x04 ), code( null, CELL_FUNCTION,  1, read_list     , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'r'  ), code( null, CELL_FUNCTION,  0, read          , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x06 ), code( null, CELL_FUNCTION,  4, apply_forms   , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x05 ), code( null, CELL_FUNCTION,  4, apply_forms   , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '`'  ), code( null, CELL_FUNCTION,  3, apply         , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'o'  ), code( null, CELL_FUNCTION,  2, eval_list     , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'e'  ), code( null, CELL_FUNCTION,  1, eval          , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'd'  ), code( null, CELL_FUNCTION,  1, describe      , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x07 ), code( null, CELL_FUNCTION,  2, link_callees  , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x08 ), code( null, CELL_FUNCTION,  2, link_callers  , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x09 ), code( null, CELL_FUNCTION,  1, repl          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x06 ), code( null, CELL_FUNCTION,  2, link_callees  , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x07 ), code( null, CELL_FUNCTION,  2, link_callers  , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x08 ), code( null, CELL_FUNCTION,  1, repl          , 0 ) ), env );
 
 	// procedures…
 	env = cons( null, cons( null, symbol( null, 0xff ), code( null, CELL_PROCEDURE, 1, quit          , 0 ) ), env );

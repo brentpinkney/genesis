@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 
 #define PAGE_SIZE		4096
+#define NUM_PAGES		1024
 #define WORD_SIZE		8
 #define CELL_NULL		0x01
 #define CELL_TUPLE		0x02
@@ -13,14 +14,16 @@
 #define CELL_INTEGER		0x04
 #define MASK_TYPE		0x07
 #define MASK_SYMBOL		0xff00
+#define MASK_INTEGER		0xff00
 #define MASK_INTEGER_HI		0xf000
 #define MASK_INTEGER_LO		0x0f00
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
-#define cell_type( c ) ( c->header & MASK_TYPE )
+#define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
+
 #define is_true  != null
 #define is_false == null
 
@@ -36,11 +39,7 @@ struct _cell
 };
 
 // procedures…
-static void halt( unsigned long n )
-{
-	dprintf( "halting…\n" );
-	exit( n );
-}
+static void quit( unsigned long n ) { exit( n ); }
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -50,29 +49,26 @@ static cell * allocate( cell * null, unsigned long words )
 	return this;
 }
 
-static cell * sire( )
+static cell * sire( unsigned long pages )
 {
-	unsigned long bytes = PAGE_SIZE * 1;
+	unsigned long bytes = PAGE_SIZE * pages;
 	void * arena = mmap(
 			0,
 			bytes,
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
-	if( arena == MAP_FAILED ) halt( 1 );
+	if( arena == MAP_FAILED ) quit( 1 );
 
-	// build null by hand…
-	cell * null  = arena;
+	cell * null  = arena;				// build null by hand
 	null->header = CELL_NULL;
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
 
-	// make the size integer by hand (useful as 'not null')…
-	cell * size  = allocate( null, 1 );
+	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
 	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	null->size   = size;
 	dprintf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
-
-	null->size = size;
 
 	dprintf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
 		null->header, null->size->header, (unsigned long) null->arena, (unsigned long) null->next );
@@ -141,7 +137,7 @@ static cell * assq( cell * null, cell * key, cell * alist )
 
 int main( )
 {
-	cell * null = sire( );
+	cell * null = sire( NUM_PAGES );
 	cell * env  = null;
 
 	// tests…

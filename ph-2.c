@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 
 #define PAGE_SIZE		4096
+#define NUM_PAGES		1024
 #define WORD_SIZE		8
 #define CELL_NULL		0x01
 #define CELL_TUPLE		0x02
@@ -19,10 +20,9 @@
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
-#define cell_type( c ) ( c->header & MASK_TYPE )
+#define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
-#define operator_type( c ) ( c->header & MASK_OPERATOR )
 
 #define is_true  != null
 #define is_false == null
@@ -39,10 +39,11 @@ struct _cell
 };
 
 // procedures…
-static void halt( unsigned long n )
-{
-	exit( n );
-}
+static void quit( unsigned long n ) { exit( n ); }
+
+static unsigned char get_char( ) { return fgetc( stdin ); }
+
+static unsigned char put_char( unsigned char c ) { return fputc( c, stdout ); }
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -51,27 +52,25 @@ static cell * allocate( cell * null, unsigned long words )
 	return this;
 }
 
-static cell * sire( )
+static cell * sire( unsigned long pages )
 {
-	unsigned long bytes = PAGE_SIZE * 1;
+	unsigned long bytes = PAGE_SIZE * pages;
 	void * arena = mmap(
 			0,
 			bytes,
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
-	if( arena == MAP_FAILED ) halt( 1 );
+	if( arena == MAP_FAILED ) quit( 1 );
 
-	// build null by hand…
-	cell * null  = arena;
+	cell * null  = arena;				// build null by hand
 	null->header = CELL_NULL;
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
 
-	// make the size integer by hand (useful as 'not null')…
-	cell * size  = allocate( null, 1 );
+	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
 	size->header = ( bytes << 8 ) + CELL_INTEGER;
-	null->size = size;
+	null->size   = size;
 	return null;
 }
 
@@ -87,16 +86,6 @@ static cell * integer( cell * null, unsigned char n )
 	cell * i = allocate( null, 1 );
 	i->header = ( n << 8 ) + CELL_INTEGER;
 	return i;
-}
-
-static unsigned char put_char( unsigned char c )
-{
-	return fputc( c, stdout );
-}
-
-static unsigned char get_char( )
-{
-	return fgetc( stdin );
 }
 
 // functions…
@@ -144,18 +133,12 @@ static cell * assq( cell * null, cell * key, cell * alist )
 static cell * reverse( cell * null, cell * lst )
 {
 	cell * rev = null;
-	while( 1 )
+	while( lst != null )
 	{
-		if( lst == null )
-		{
-			return rev;
-		}
-		else
-		{
-			rev = cons( null, lst->car, rev );
-			lst = lst->cdr;
-		}
+		rev = cons( null, lst->car, rev );
+		lst = lst->cdr;
 	}
+	return rev;
 }
 
 static cell * print_integer( cell * null, cell * exp )
@@ -275,7 +258,7 @@ static cell * read_integer( cell * null )
 		}
 		else
 		{
-			halt( 3 );
+			quit( 3 );
 		}
 	}
 	c = c << 4;
@@ -332,12 +315,12 @@ static cell * read( cell * null )
 		}
 		else
 		{
-			halt( 3 );
+			quit( 3 );
 		}
 	}
 	if( ( c >= '0' ) && ( c <= '9' ) ) // 0 - 9 sans 0x prefix
 	{
-		halt( 3 );
+		quit( 3 );
 	}
 	if( c == '(' )
 	{
@@ -352,7 +335,7 @@ static cell * read( cell * null )
 		return symbol( null, c );
 	}
 	
-	halt( 2 );
+	quit( 2 );
 	return null;
 }
 
@@ -367,7 +350,7 @@ static cell * repl( cell * null, cell * env )
 
 int main( )
 {
-	cell * null = sire( );
+	cell * null = sire( NUM_PAGES );
 	cell * env  = null;
 
 	repl( null, env );

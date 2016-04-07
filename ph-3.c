@@ -6,16 +6,17 @@
 #include <sys/mman.h>
 
 #define PAGE_SIZE		4096
+#define NUM_PAGES		1024
 #define WORD_SIZE		8
 #define CELL_NULL		0x01
 #define CELL_TUPLE		0x02
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
-#define CELL_OPERATOR		0x05
-#define CELL_PROCEDURE		0x05	// machine language, REPL access
-#define CELL_FUNCTION		0x15	// machine language, no REPL access
-#define CELL_LAMBDA		0x25	// operative s-expressions
-#define CELL_FEXPR		0x35	// applicative s-expressions
+#define CELL_OPERATOR		0x05	// 0000 0011
+#define CELL_PROCEDURE		0x05	// 0000 0011 machine language, REPL access
+#define CELL_FUNCTION		0x25	// 0010 0011 machine language, no REPL access
+#define CELL_LAMBDA		0x15	// 0001 0011 operative s-expressions
+#define CELL_FEXPR		0x35	// 0011 0011 applicative s-expressions
 #define MASK_TYPE		0x07
 #define MASK_SYMBOL		0xff00
 #define MASK_INTEGER		0xff00
@@ -25,7 +26,7 @@
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
-#define cell_type( c ) ( c->header & MASK_TYPE )
+#define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
 #define operator_type( c ) ( c->header & MASK_OPERATOR )
@@ -42,15 +43,16 @@ struct _cell
 		struct { cell * size; void * arena, * next; };
 		struct { cell * car, * cdr; };
 		struct { cell * operation; };
-		struct { void * bytes; };
+		struct { void * address; };
 	};
 };
 
 // procedures…
-static void halt( unsigned long n )
-{
-	exit( n );
-}
+static void quit( unsigned long n ) { exit( n ); }
+
+static unsigned char get_char( ) { return fgetc( stdin ); }
+
+static unsigned char put_char( unsigned char c ) { return fputc( c, stdout ); }
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -59,27 +61,25 @@ static cell * allocate( cell * null, unsigned long words )
 	return this;
 }
 
-static cell * sire( )
+static cell * sire( unsigned long pages )
 {
-	unsigned long bytes = PAGE_SIZE * 1;
+	unsigned long bytes = PAGE_SIZE * pages;
 	void * arena = mmap(
 			0,
 			bytes,
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_ANONYMOUS | MAP_PRIVATE,
 			0, 0 );
-	if( arena == MAP_FAILED ) halt( 1 );
+	if( arena == MAP_FAILED ) quit( 1 );
 
-	// build null by hand…
-	cell * null  = arena;
+	cell * null  = arena;				// build null by hand
 	null->header = CELL_NULL;
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
 
-	// make the size integer by hand (useful as 'not null')…
-	cell * size  = allocate( null, 1 );
+	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
 	size->header = ( bytes << 8 ) + CELL_INTEGER;
-	null->size = size;
+	null->size   = size;
 	return null;
 }
 
@@ -97,14 +97,12 @@ static cell * integer( cell * null, unsigned char n )
 	return i;
 }
 
-static unsigned char put_char( unsigned char c )
+static cell * expression( cell * null, unsigned char type, cell * exp )
 {
-	return fputc( c, stdout );
-}
-
-static unsigned char get_char( )
-{
-	return fgetc( stdin );
+	cell * i = allocate( null, 2 );
+	i->header = type;
+	i->operation = exp;
+	return i;
 }
 
 // functions…
@@ -133,22 +131,6 @@ static cell * cons( cell * null, cell * a, cell * b )
 	return t;
 }
 
-static cell * lambda( cell * null, cell * exp )
-{
-	cell * i = allocate( null, 2 );
-	i->header = CELL_LAMBDA;
-	i->operation = exp;
-	return i;
-}
-
-static cell * fexpr( cell * null, cell * exp )
-{
-	cell * i = allocate( null, 2 );
-	i->header = CELL_FEXPR;
-	i->operation = exp;
-	return i;
-}
-
 static cell * equals( cell * null, cell * a, cell * b )
 {
 	return ( ( is_tuple( null, a ) is_true ) || ( is_tuple( null, b ) is_true ) )
@@ -168,18 +150,12 @@ static cell * assq( cell * null, cell * key, cell * alist )
 static cell * reverse( cell * null, cell * lst )
 {
 	cell * rev = null;
-	while( 1 )
+	while( lst != null )
 	{
-		if( lst == null )
-		{
-			return rev;
-		}
-		else
-		{
-			rev = cons( null, lst->car, rev );
-			lst = lst->cdr;
-		}
+		rev = cons( null, lst->car, rev );
+		lst = lst->cdr;
 	}
+	return rev;
 }
 
 static cell * print_integer( cell * null, cell * exp )
@@ -284,7 +260,7 @@ static cell * print( cell * null, cell * exp )
 			switch( operator_type( exp ) )
 			{
 				case CELL_PROCEDURE:
-					halt( 9 );
+					quit( 9 );
 					break;
 				case CELL_FUNCTION:
 					put_char( 'p' ); put_char( '0' + integer_value( exp ) );
@@ -314,7 +290,7 @@ static cell * read_integer( cell * null )
 		}
 		else
 		{
-			halt( 3 );
+			quit( 3 );
 		}
 	}
 	c = c << 4;
@@ -371,12 +347,12 @@ static cell * read( cell * null )
 		}
 		else
 		{
-			halt( 3 );
+			quit( 3 );
 		}
 	}
 	if( ( c >= '0' ) && ( c <= '9' ) ) // 0 - 9 sans 0x prefix
 	{
-		halt( 3 );
+		quit( 3 );
 	}
 	if( c == '(' )
 	{
@@ -391,7 +367,7 @@ static cell * read( cell * null )
 		return symbol( null, c );
 	}
 	
-	halt( 2 );
+	quit( 2 );
 	return null;
 }
 
@@ -442,10 +418,10 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 	switch( operator_type( op ) )
 	{
 		case CELL_PROCEDURE:
-			halt( 8 );
+			quit( 8 );
 			break;
 		case CELL_FUNCTION:
-			halt( 8 );
+			quit( 8 );
 			break;
 		case CELL_LAMBDA:
 		{
@@ -482,7 +458,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			return cons( null, res, env );				// any set! will be lost on return
 		}
 	}
-	halt( 6 );
+	quit( 6 );
 	return null;
 }
 
@@ -515,58 +491,58 @@ static cell * eval( cell * null, cell * exp, cell * env )
 				dprintf( "eval: list, is special?\n" );
 				switch( symbol_value( first ) )
 				{
-					case '!':
-					{
-						dprintf( "eval: !\n" );
-						cell * key = exp->cdr->car;
-						cell * ans = eval( null, exp->cdr->cdr->car, env );
-						cell * val = ans->car;
-						env = ans->cdr;
+				case '!':
+				{
+					dprintf( "eval: !\n" );
+					cell * key = exp->cdr->car;
+					cell * ans = eval( null, exp->cdr->cdr->car, env );
+					cell * val = ans->car;
+					env = ans->cdr;
 
-						cell * tuple = assq( null, key, env );
-						if( tuple == null )
-						{
-							tuple = cons( null, key, val );
-							env = cons( null, tuple, env );
-						}
-						else
-						{
-							set_cdr( null, tuple, val );
-						}
-						return cons( null, tuple, env );
-					}
-					case '?':
+					cell * tuple = assq( null, key, env );
+					if( tuple == null )
 					{
-						dprintf( "eval: ?\n" );
-						cell * tst = exp->cdr->car;
-						cell * con = exp->cdr->cdr->car;
-						cell * alt = exp->cdr->cdr->cdr->car;
+						tuple = cons( null, key, val );
+						env = cons( null, tuple, env );
+					}
+					else
+					{
+						set_cdr( null, tuple, val );
+					}
+					return cons( null, tuple, env );
+				}
+				case '?':
+				{
+					dprintf( "eval: ?\n" );
+					cell * tst = exp->cdr->car;
+					cell * con = exp->cdr->cdr->car;
+					cell * alt = exp->cdr->cdr->cdr->car;
 
-						cell * ans = eval( null, tst, env );
-						tst = ans->car;
-						env = ans->cdr;
-						if( tst == null )
-						{
-							cell * ans = eval( null, alt, env );
-							return cons( null, ans->car, ans->cdr );
-						}
-						else
-						{
-							cell * ans = eval( null, con, env );
-							return cons( null, ans->car, ans->cdr );
-						}
-					}
-					case '^':
+					cell * ans = eval( null, tst, env );
+					tst = ans->car;
+					env = ans->cdr;
+					if( tst == null )
 					{
-						dprintf( "eval: ^\n" );
-						return cons( null, lambda( null, exp ), env );
+						cell * ans = eval( null, alt, env );
+						return cons( null, ans->car, ans->cdr );
 					}
-					case '$':
+					else
 					{
-						dprintf( "eval: $\n" );
-						return cons( null, fexpr( null, exp ), env );
+						cell * ans = eval( null, con, env );
+						return cons( null, ans->car, ans->cdr );
 					}
 				}
+				case '^':
+				{
+					dprintf( "eval: ^\n" );
+					return cons( null, expression( null, CELL_LAMBDA, exp ), env );
+				}
+				case '$':
+				{
+					dprintf( "eval: $\n" );
+					return cons( null, expression( null, CELL_FEXPR, exp ), env );
+				}
+			}
 			}
 			// else
 			dprintf( "eval: applying " ); print( null, first ); dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
@@ -585,7 +561,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			dprintf( "eval: integer\n" );
 			return cons( null, exp, env );
 	}
-	halt( 4 );
+	quit( 4 );
 	return null;
 }
 
@@ -603,7 +579,7 @@ static cell * repl( cell * null, cell * env )
 
 int main( )
 {
-	cell * null = sire( );
+	cell * null = sire( NUM_PAGES );
 	cell * env  = null;
 
 	repl( null, env );
