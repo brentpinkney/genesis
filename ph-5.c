@@ -27,7 +27,7 @@
 
 int verbose = 1;
 #define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
-#define cell_type( c ) ( c->header & MASK_TYPE )
+#define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
 #define operator_type( c ) ( c->header & MASK_OPERATOR )
@@ -51,7 +51,6 @@ struct _cell
 // procedures…
 static void quit( unsigned long n )
 {
-	printf( "quit: n = %02lx\n", n );
 	exit( n );
 }
 
@@ -73,14 +72,12 @@ static cell * sire( unsigned long pages )
 			0, 0 );
 	if( arena == MAP_FAILED ) quit( 1 );
 
-	// build null by hand…
-	cell * null  = arena;
+	cell * null  = arena;				// build null by hand
 	null->header = CELL_NULL;
 	null->arena  = arena;
 	null->next   = arena + ( 4 * WORD_SIZE );
 
-	// make the size integer (useful as 'not null')…
-	cell * size  = allocate( null, 1 );
+	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
 	size->header = ( bytes << 8 ) + CELL_INTEGER;
 	null->size   = size;
 	return null;
@@ -151,19 +148,6 @@ static void toggle_writable( void * address, int writable )
 }
 
 // functions…
-static cell * halt( cell * null, cell * n )					// XXX
-{
-	printf( "halt:\n" );
-	quit( integer_value( n ) );
-	return n;
-}
-
-static cell * haltXXX( cell * null, cell * n )					// XXX
-{
-	printf( "haltXXX:\n" );
-	return halt( null, n );
-}
-
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
@@ -225,6 +209,152 @@ static cell * length( cell * null, cell * lst )
 		lst = lst->cdr;
 	}
 	return integer( null, len );
+}
+
+static cell * describe( cell * null, cell * exp )
+{
+	printf( "address: %16p\theader: %016lx\t", exp, exp->header );
+	switch( cell_type( exp ) )
+	{
+		case CELL_NULL:
+		{
+			unsigned long size = exp->size->header >> 8;
+			printf( "null\nsize:      0x%08lx\t\tarena:%16p\t\tnext:%16p", size, exp->arena, exp->next );
+			printf( "\tused: %.2f%%\n", ( exp->next - exp->arena ) * 100.0 / size );
+			break;
+		}
+		case CELL_TUPLE:
+		{
+			printf( "tuple\ncar:     %16p\tcdr:  %16p\n", exp->car, exp->cdr );
+			break;
+		}
+		case CELL_SYMBOL:
+		{
+			unsigned char value = symbol_value( exp );
+			printf( "symbol\ncharacter: '%c'\t\t\tvalue:  0x%02x (%d)\n", value, value, value );
+			break;
+		}
+		case CELL_INTEGER:
+		{
+			unsigned long value = integer_value( exp );
+			printf( "integer\nvalue:     0x%02lx (%ld)\n", value, value );
+			break;
+		}
+		case CELL_OPERATOR:
+			switch( operator_type( exp ) )
+			{
+				case CELL_PROCEDURE:
+				case CELL_FUNCTION:
+				{
+					unsigned long words = ( exp->header >> 16 ) - 2;
+					unsigned long bytes = words * WORD_SIZE;
+					printf( "%s\narity:     %ld\tsection: %s\taddress:%16p\tlength: %ld\n",
+						operator_type( exp ) == CELL_PROCEDURE ? "procedure" : "function",
+						integer_value( exp ),
+						exp->address < null->arena ? "text" : "arena",
+						exp->address,
+						words );
+					if( exp->address >= null->arena )
+					{
+						printf( "bytes:     " );
+						for( unsigned long i = 0; i < bytes; )
+						{
+							printf( "%02x ", exp->bytes[ i ] ); 
+							i++;
+							if( ( i % 8 == 0 ) && ( i < bytes ) ) printf( "\n           " );
+						}
+						put_char( '\n' );
+					}
+					break;
+				}
+				case CELL_LAMBDA:
+					printf( "lambda\noperation: %p\n", exp->operation );
+					break;
+				case CELL_FEXPR:
+					printf( "fexpr\noperation: %p\n", exp->operation );
+					break;
+			}
+			break;
+	}
+	return exp;
+}
+
+static cell * link_callees( cell * null, cell * exp, cell * env )
+{
+	dprintf( "link_callees:\n" );
+	if( exp->address >= null->arena )
+	{
+		unsigned long words = ( exp->header >> 16 ) - 2;
+		unsigned long bytes = words * WORD_SIZE;
+		for( unsigned long i = 0; i < bytes; )
+		{
+			unsigned char * b = exp->bytes + i;
+			if( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&				// movabs R10
+			    ( *( b + 03 ) == 0x00 ) && ( *( b + 04 ) == 0x00 ) &&				// unlinked
+			    ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) )	// call R10
+			{
+				dprintf( "[0x%02x → ", *( b + 2) );
+				cell * tuple = assq( null, symbol( null, *( b + 2 ) ), env );
+				if( tuple != null )
+				{
+					dprintf( "%p] ", tuple->cdr->address );
+					memcpy( b + 2, &( tuple->cdr->address ), WORD_SIZE );
+				}
+				else
+				{
+					dprintf( "FAIL ]" );
+					quit( 5 );
+				}
+			}
+			printf( "%02x ", *b );
+			i++;
+		}
+		printf( "\n" );
+	}
+	return exp;
+}
+
+static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
+{
+	dprintf( "link_callers: to '%c' at %p\n", (int) symbol_value( key ), exp->address );
+	cell * existing = assq( null, key, env );
+	if( existing != null )
+	{
+		dprintf( "link_callers: existing at %p\n", existing->cdr->address );
+		while( env != null )
+		{
+			cell * tuple = env->car;
+			cell * code  = tuple->cdr;
+			if( ( cell_type( code ) == CELL_PROCEDURE ) || ( cell_type( code ) == CELL_FUNCTION ) )
+			{
+				unsigned char * b = code->address;
+				while( *b != 0xc3 ) // ret
+				{
+					if( ( ( *( b + 00 ) == 0x48 ) && ( *( b + 01 ) == 0xb8 ) &&	// movabs rax,…
+					      ( *( b + 10 ) == 0xff ) && ( *( b + 11 ) == 0xd0 ) )	// call   rax
+					 || ( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&	// movabs r10,call R10
+					      ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) ) )
+					{
+						void * p;
+						memcpy( &p, b + 2, WORD_SIZE );
+						if( p == existing->cdr->address )
+						{
+							unsigned long s = symbol_value( tuple->car );
+							dprintf( "link_callers: re-linking '%c' (%ld) %p → %p\n",
+								(int) s, s,
+								p, exp->address );
+							toggle_writable( code->address, 1 );
+							memcpy( b + 2, &( exp->address ), WORD_SIZE );
+							toggle_writable( code->address, 0 );
+						}
+					}
+					b++;
+				}
+			}
+			env = env->cdr;
+		}
+	}
+	return exp;
 }
 
 static cell * print_integer( cell * null, cell * exp )
@@ -519,38 +649,38 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			args = ans->car; env = ans->cdr;
 			switch( integer_value( op ) )
 			{
-				case 0:
-				{
-					cell * (* proc)(cell *) = (void *) op->address;
-					ans = proc( null );
-					break;
-				}
-				case 1:
-				{
-					cell * (* proc)(cell *, cell *) = (void *) op->address;
-					ans = proc( null, args->car );
-					break;
-				}
-				case 2:
-				{
-					cell * (* proc)(cell *, cell *, cell *) = (void *) op->address;
-					ans = proc( null, args->car, args->cdr->car );
-					break;
-				}
-				case 3:
-				{
-					cell * (* proc)(cell *, cell *, cell *, cell *) = (void *) op->address;
-					ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car );
-					break;
-				}
-				case 4:
-				{
-					cell * (* proc)(cell *, cell *, cell *, cell *, cell *) = (void *) op->address;
-					ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car, args->cdr->cdr->cdr->car );
-					break;
-				}
-				default:
-					quit( 7 );
+			case 0:
+			{
+				cell * (* proc)(cell *) = (void *) op->address;
+				ans = proc( null );
+				break;
+			}
+			case 1:
+			{
+				cell * (* proc)(cell *, cell *) = (void *) op->address;
+				ans = proc( null, args->car );
+				break;
+			}
+			case 2:
+			{
+				cell * (* proc)(cell *, cell *, cell *) = (void *) op->address;
+				ans = proc( null, args->car, args->cdr->car );
+				break;
+			}
+			case 3:
+			{
+				cell * (* proc)(cell *, cell *, cell *, cell *) = (void *) op->address;
+				ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car );
+				break;
+			}
+			case 4:
+			{
+				cell * (* proc)(cell *, cell *, cell *, cell *, cell *) = (void *) op->address;
+				ans = proc( null, args->car, args->cdr->car, args->cdr->cdr->car, args->cdr->cdr->cdr->car );
+				break;
+			}
+			default:
+				quit( 7 );
 			}
 			return evaluated ? ans : cons( null, ans, env );	// any set! will be lost on return
 		}
@@ -604,8 +734,6 @@ static cell * eval_list( cell * null, cell * lst, cell * env )
 	return cons( null, reverse( null, res ), env );
 }
 
-static cell * link_callees( cell * null, cell * exp, cell * env );			// XXX
-static cell * link_callers( cell * null, cell * key, cell * exp, cell * env );		// XXX
 static cell * eval( cell * null, cell * exp, cell * env )
 {
 	switch( cell_type( exp ) )
@@ -619,77 +747,77 @@ static cell * eval( cell * null, cell * exp, cell * env )
 			{
 				switch( symbol_value( first ) )
 				{
-					case '!':
+				case '!':
+				{
+					cell * key = exp->cdr->car;
+					cell * ans = eval( null, exp->cdr->cdr->car, env );
+					cell * val = ans->car;
+					env = ans->cdr;
+
+					if( ( cell_type( val ) == CELL_PROCEDURE ) || ( cell_type( val ) == CELL_FUNCTION ) )
 					{
-						cell * key = exp->cdr->car;
-						cell * ans = eval( null, exp->cdr->cdr->car, env );
-						cell * val = ans->car;
-						env = ans->cdr;
+						link_callers( null, key, val, env );
+					}	
 
-						if( ( cell_type( val ) == CELL_PROCEDURE ) || ( cell_type( val ) == CELL_FUNCTION ) )
-						{
-							link_callers( null, key, val, env );
-						}	
-
-						cell * tuple = assq( null, key, env );
-						if( tuple == null )
-						{
-							tuple = cons( null, key, val );
-							env = cons( null, tuple, env );
-						}
-						else
-						{
-							set_cdr( null, tuple, val );
-						}
-						return cons( null, tuple, env );
-					}
-					case '?':
+					cell * tuple = assq( null, key, env );
+					if( tuple == null )
 					{
-						cell * tst = exp->cdr->car;
-						cell * con = exp->cdr->cdr->car;
-						cell * alt = exp->cdr->cdr->cdr->car;
-
-						cell * ans = eval( null, tst, env );
-						tst = ans->car;
-						env = ans->cdr;
-						if( tst == null )
-						{
-							cell * ans = eval( null, alt, env );
-							return cons( null, ans->car, ans->cdr );
-						}
-						else
-						{
-							cell * ans = eval( null, con, env );
-							return cons( null, ans->car, ans->cdr );
-						}
+						tuple = cons( null, key, val );
+						env = cons( null, tuple, env );
 					}
-					case '^':
+					else
 					{
-						return cons( null, expression( null, CELL_LAMBDA, exp ), env );
+						set_cdr( null, tuple, val );
 					}
-					case '$':
+					return cons( null, tuple, env );
+				}
+				case '?':
+				{
+					cell * tst = exp->cdr->car;
+					cell * con = exp->cdr->cdr->car;
+					cell * alt = exp->cdr->cdr->cdr->car;
+
+					cell * ans = eval( null, tst, env );
+					tst = ans->car;
+					env = ans->cdr;
+					if( tst == null )
 					{
-						return cons( null, expression( null, CELL_FEXPR, exp ), env );
+						cell * ans = eval( null, alt, env );
+						return cons( null, ans->car, ans->cdr );
 					}
-					case '@':
+					else
 					{
-						cell * ans = eval( null, exp->cdr->car, env );
-						unsigned long type = integer_value( ans->car );
-
-						ans = eval( null, exp->cdr->cdr->car, env );
-						unsigned long nargs = integer_value( ans->car );
-
-						ans = eval_list( null, exp->cdr->cdr->cdr, env );
-						cell * bytes = ans->car;
-
-						if( ( type == CELL_PROCEDURE ) || ( type == CELL_FUNCTION ) )
-						{
-							ans = code( null, type, nargs, 0, bytes );
-							ans = link_callees( null, ans, env );
-							return cons( null, ans, env );
-						}
-						quit( 4 );
+						cell * ans = eval( null, con, env );
+						return cons( null, ans->car, ans->cdr );
 					}
+				}
+				case '^':
+				{
+					return cons( null, expression( null, CELL_LAMBDA, exp ), env );
+				}
+				case '$':
+				{
+					return cons( null, expression( null, CELL_FEXPR, exp ), env );
+				}
+				case '@':
+				{
+					cell * ans = eval( null, exp->cdr->car, env );
+					unsigned long type = integer_value( ans->car );
+
+					ans = eval( null, exp->cdr->cdr->car, env );
+					unsigned long nargs = integer_value( ans->car );
+
+					ans = eval_list( null, exp->cdr->cdr->cdr, env );
+					cell * bytes = ans->car;
+
+					if( ( type == CELL_PROCEDURE ) || ( type == CELL_FUNCTION ) )
+					{
+						ans = code( null, type, nargs, 0, bytes );
+						ans = link_callees( null, ans, env );
+						return cons( null, ans, env );
+					}
+					quit( 4 );
+				}
 				}
 			}
 			// else
@@ -719,159 +847,12 @@ static cell * repl( cell * null, cell * env )
 	return repl( null, ans->cdr );
 }
 
-static cell * describe( cell * null, cell * exp )
-{
-	printf( "address: %16p\theader: %016lx\t", exp, exp->header );
-	switch( cell_type( exp ) )
-	{
-		case CELL_NULL:
-		{
-			unsigned long size = exp->size->header >> 8;
-			printf( "null\nsize:      0x%08lx\t\tarena:%16p\t\tnext:%16p", size, exp->arena, exp->next );
-			printf( "\tused: %.2f%%\n", ( exp->next - exp->arena ) * 100.0 / size );
-			break;
-		}
-		case CELL_TUPLE:
-		{
-			printf( "tuple\ncar:     %16p\tcdr:  %16p\n", exp->car, exp->cdr );
-			break;
-		}
-		case CELL_SYMBOL:
-		{
-			unsigned char value = symbol_value( exp );
-			printf( "symbol\ncharacter: '%c'\t\t\tvalue:  0x%02x (%d)\n", value, value, value );
-			break;
-		}
-		case CELL_INTEGER:
-		{
-			unsigned long value = integer_value( exp );
-			printf( "integer\nvalue:     0x%02lx (%ld)\n", value, value );
-			break;
-		}
-		case CELL_OPERATOR:
-			switch( operator_type( exp ) )
-			{
-				case CELL_PROCEDURE:
-				case CELL_FUNCTION:
-				{
-					unsigned long words = ( exp->header >> 16 ) - 2;
-					unsigned long bytes = words * WORD_SIZE;
-					printf( "%s\narity:     %ld\tsection: %s\taddress:%16p\tlength: %ld\n",
-						operator_type( exp ) == CELL_PROCEDURE ? "procedure" : "function",
-						integer_value( exp ),
-						exp->address < null->arena ? "text" : "arena",
-						exp->address,
-						words );
-					if( exp->address >= null->arena )
-					{
-						printf( "bytes:     " );
-						for( unsigned long i = 0; i < bytes; )
-						{
-							printf( "%02x ", exp->bytes[ i ] ); 
-							i++;
-							if( ( i % 8 == 0 ) && ( i < bytes ) ) printf( "\n           " );
-						}
-						printf( "\n" );
-					}
-					break;
-				}
-				case CELL_LAMBDA:
-					printf( "lambda\noperation: %p\n", exp->operation );
-					break;
-				case CELL_FEXPR:
-					printf( "fexpr\noperation: %p\n", exp->operation );
-					break;
-			}
-			break;
-	}
-	return exp;
-}
-
-static cell * link_callees( cell * null, cell * exp, cell * env )
-{
-	dprintf( "link_callees:\n" );
-	if( exp->address >= null->arena )
-	{
-		unsigned long words = ( exp->header >> 16 ) - 2;
-		unsigned long bytes = words * WORD_SIZE;
-		for( unsigned long i = 0; i < bytes; )
-		{
-			unsigned char * b = exp->bytes + i;
-			if( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&				// movabs R10,…
-			    ( *( b + 03 ) == 0x00 ) && ( *( b + 04 ) == 0x00 ) &&				// unlinked
-			    ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) )	// call R10
-			{
-				dprintf( "[0x%02x → ", *( b + 2) );
-				cell * tuple = assq( null, symbol( null, *( b + 2 ) ), env );
-				if( tuple != null )
-				{
-					dprintf( "%p] ", tuple->cdr->address );
-					memcpy( b + 2, &( tuple->cdr->address ), WORD_SIZE );
-				}
-				else
-				{
-					dprintf( "FAIL ]" );
-					quit( 5 );
-				}
-			}
-			printf( "%02x ", *b );
-			i++;
-		}
-		printf( "\n" );
-	}
-	return exp;
-}
-
-static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
-{
-	dprintf( "link_callers: to '%c' at %p\n", (int) symbol_value( key ), exp->address );
-	cell * existing = assq( null, key, env );
-	if( existing != null )
-	{
-		dprintf( "link_callers: existing at %p\n", existing->cdr->address );
-		while( env != null )
-		{
-			cell * tuple = env->car;
-			cell * code  = tuple->cdr;
-			if( ( cell_type( code ) == CELL_PROCEDURE ) || ( cell_type( code ) == CELL_FUNCTION ) )
-			{
-				unsigned char * b = code->address;
-				while( *b != 0xc3 ) // ret
-				{
-					if( ( ( *( b + 00 ) == 0x48 ) && ( *( b + 01 ) == 0xb8 ) &&	// movabs rax,…
-					      ( *( b + 10 ) == 0xff ) && ( *( b + 11 ) == 0xd0 ) )	// call   rax
-					 || ( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&	// movabs r10,…
-					      ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) ) ) // call R10
-					{
-						void * p;
-						memcpy( &p, b + 2, WORD_SIZE );
-						if( p == existing->cdr->address )
-						{
-							unsigned long s = symbol_value( tuple->car );
-							dprintf( "link_callers: re-linking '%c' (%ld) %p → %p\n",
-								(int) s, s,
-								p, exp->address );
-							toggle_writable( code->address, 1 );
-							memcpy( b + 2, &( exp->address ), WORD_SIZE );
-							toggle_writable( code->address, 0 );
-						}
-					}
-					b++;
-				}
-			}
-			env = env->cdr;
-		}
-	}
-	return exp;
-}
-
 int main( )
 {
 	cell * null = sire( NUM_PAGES );
 	cell * env  = null;
 
 	// functions…
-	env = cons( null, cons( null, symbol( null, 'h'  ), code( null, CELL_FUNCTION,  1, halt          , 0 ) ), env ); // XXX
 	env = cons( null, cons( null, symbol( null, '#'  ), code( null, CELL_FUNCTION,  1, car           , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, '%'  ), code( null, CELL_FUNCTION,  1, cdr           , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x00 ), code( null, CELL_FUNCTION,  2, set_car       , 0 ) ), env );
@@ -898,9 +879,6 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 0x07 ), code( null, CELL_FUNCTION,  2, link_callees  , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x08 ), code( null, CELL_FUNCTION,  2, link_callers  , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x09 ), code( null, CELL_FUNCTION,  1, repl          , 0 ) ), env );
-
-	// XXX
-	env = cons( null, cons( null, symbol( null, 'g'  ), code( null, CELL_FUNCTION,  1, haltXXX       , 0 ) ), env );
 
 	// procedures…
 	env = cons( null, cons( null, symbol( null, 0xff ), code( null, CELL_PROCEDURE, 1, quit          , 0 ) ), env );
