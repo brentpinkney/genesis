@@ -250,76 +250,6 @@ static cell * length( cell * null, cell * lst )
 	return integer( null, len );
 }
 
-static cell * describe( cell * null, cell * exp )
-{
-	/*
-	printf( "address: %16p\theader: %016lx\t", exp, exp->header );
-	switch( cell_type( exp ) )
-	{
-		case CELL_NULL:
-		{
-			unsigned long size = exp->size->header >> 8;
-			printf( "null\nsize:      0x%08lx\t\tarena:%16p\t\tnext:%16p", size, exp->arena, exp->next );
-			printf( "\tused: %.2f%%\n", ( exp->next - exp->arena ) * 100.0 / size );
-			break;
-		}
-		case CELL_TUPLE:
-		{
-			printf( "tuple\ncar:     %16p\tcdr:  %16p\n", exp->car, exp->cdr );
-			break;
-		}
-		case CELL_SYMBOL:
-		{
-			unsigned char value = symbol_value( exp );
-			printf( "symbol\ncharacter: '%c'\t\t\tvalue:  0x%02x (%d)\n", value, value, value );
-			break;
-		}
-		case CELL_INTEGER:
-		{
-			unsigned long value = integer_value( exp );
-			printf( "integer\nvalue:     0x%02lx (%ld)\n", value, value );
-			break;
-		}
-		case CELL_OPERATOR:
-			switch( operator_type( exp ) )
-			{
-				case CELL_PROCEDURE:
-				case CELL_FUNCTION:
-				{
-					unsigned long words = ( exp->header >> 16 ) - 2;
-					unsigned long bytes = words * WORD_SIZE;
-					printf( "%s\narity:     %ld\tsection: %s\taddress:%16p\tlength: %ld\n",
-						operator_type( exp ) == CELL_PROCEDURE ? "procedure" : "function",
-						integer_value( exp ),
-						exp->address < null->arena ? "text" : "arena",
-						exp->address,
-						words );
-					if( exp->address >= null->arena )
-					{
-						printf( "bytes:     " );
-						for( unsigned long i = 0; i < bytes; )
-						{
-							printf( "%02x ", exp->bytes[ i ] ); 
-							i++;
-							if( ( i % 8 == 0 ) && ( i < bytes ) ) printf( "\n           " );
-						}
-						put_char( '\n' );
-					}
-					break;
-				}
-				case CELL_LAMBDA:
-					printf( "lambda\noperation: %p\n", exp->operation );
-					break;
-				case CELL_FEXPR:
-					printf( "fexpr\noperation: %p\n", exp->operation );
-					break;
-			}
-			break;
-	}
-	*/
-	return exp;
-}
-
 static cell * link_callees( cell * null, cell * exp, cell * env )
 {
 	if( exp->address >= null->arena )
@@ -917,7 +847,6 @@ int main( )
 	env = cons( null, cons( null, symbol( null, '`'  ), code( null, CELL_FUNCTION,  3, apply         , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'o'  ), code( null, CELL_FUNCTION,  2, eval_list     , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 'e'  ), code( null, CELL_FUNCTION,  1, eval          , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 'd'  ), code( null, CELL_FUNCTION,  1, describe      , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x04 ), code( null, CELL_FUNCTION,  2, link_callees  , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x05 ), code( null, CELL_FUNCTION,  2, link_callers  , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0x06 ), code( null, CELL_FUNCTION,  1, repl          , 0 ) ), env );
