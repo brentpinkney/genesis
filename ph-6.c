@@ -820,7 +820,7 @@ static cell * repl( cell * null, cell * env )
 	return repl( null, ans->cdr );
 }
 
-int main( )
+static void main( )
 {
 	cell * null = sire( NUM_PAGES );
 //	printf( "main: sired\n" );
@@ -864,7 +864,6 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 0xf6 ), code( null, CELL_PROCEDURE, 0, main          , 0 ) ), env );
 
 	repl( null, env );
-	return 0;
 }
 
 void _start( )
