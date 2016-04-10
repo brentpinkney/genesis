@@ -1,9 +1,6 @@
 //
 // Pre-history 6. Replace calls to libc with assembler."
 //
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/mman.h>
 
 #define PAGE_SIZE		4096
 #define NUM_PAGES		1024
