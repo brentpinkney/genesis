@@ -18,8 +18,6 @@
 #define MASK_INTEGER_HI		0xf000
 #define MASK_INTEGER_LO		0x0f00
 
-int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
@@ -45,7 +43,7 @@ static cell * allocate( cell * null, unsigned long words )
 {
 	cell * this = null->next;
 	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
-	dprintf( "words: %ld, cell: %p, next: %p\n", words, this, null->next );
+	printf( "words: %ld, cell: %p, next: %p\n", words, this, null->next );
 	return this;
 }
 
@@ -68,9 +66,9 @@ static cell * sire( unsigned long pages )
 	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
 	size->header = ( bytes << 8 ) + CELL_INTEGER;
 	null->size   = size;
-	dprintf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
+	printf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
 
-	dprintf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
+	printf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
 		null->header, null->size->header, (unsigned long) null->arena, (unsigned long) null->next );
 
 	return null;
@@ -80,7 +78,7 @@ static cell * symbol( cell * null, unsigned char c )
 {
 	cell * i = allocate( null, 1 );
 	i->header = ( c << 8 ) + CELL_SYMBOL;
-	dprintf( "c: '%c', %016lx\n", (unsigned char) ( i->header >> 8 ), i->header );
+	printf( "c: '%c', %016lx\n", (unsigned char) ( i->header >> 8 ), i->header );
 	return i;
 }
 
@@ -88,7 +86,7 @@ static cell * integer( cell * null, unsigned char n )
 {
 	cell * i = allocate( null, 1 );
 	i->header = ( n << 8 ) + CELL_INTEGER;
-	dprintf( "n: 0x%02lx, %016lx\n", i->header >> 8, i->header );
+	printf( "n: 0x%02lx, %016lx\n", i->header >> 8, i->header );
 	return i;
 }
 
@@ -111,7 +109,7 @@ static cell * cons( cell * null, cell * a, cell * b )
 	t->header = CELL_TUPLE;
 	t->car = a;
 	t->cdr = b;
-	dprintf( "%016lx (%016lx . %016lx)\n", t->header, (unsigned long) car( null, t ), (unsigned long) cdr( null, t ) );
+	printf( "%016lx (%016lx . %016lx)\n", t->header, (unsigned long) car( null, t ), (unsigned long) cdr( null, t ) );
 	return t;
 }
 
@@ -137,41 +135,41 @@ int main( )
 	cell * env  = null;
 
 	// tests…
-	dprintf( "null        : %p\n", (void *) null );
-	dprintf( "null->size  : %p\n", (void *) null->size );
-	dprintf( "environment : %p\n", (void *) env  );
+	printf( "null        : %p\n", (void *) null );
+	printf( "null->size  : %p\n", (void *) null->size );
+	printf( "environment : %p\n", (void *) env  );
 
 	cell * tuple = cons( null, integer( null, 5 ), symbol( null, 'd' ) );
 
 	cell * in = is_null( null, null );
-	dprintf( "is_null(null)   : %p\n", (void *) in );
+	printf( "is_null(null)   : %p\n", (void *) in );
 	cell * nn = is_null( null, tuple );
-	dprintf( "is_null(tuple)  : %p\n", (void *) nn );
+	printf( "is_null(tuple)  : %p\n", (void *) nn );
 	cell * it = is_tuple( null, tuple );
-	dprintf( "is_tuple(tuple) : %p\n", (void *) it );
+	printf( "is_tuple(tuple) : %p\n", (void *) it );
 	cell * nt = is_tuple( null, null );
-	dprintf( "is_tuple(null)  : %p\n", (void *) nt );
+	printf( "is_tuple(null)  : %p\n", (void *) nt );
 
-	dprintf( "is_integers(5)  : %p\n", (void *) is_integer( null, car( null, tuple ) ) );
-	dprintf( "is_symbol(d)    : %p\n", (void *) is_symbol( null, cdr( null, tuple ) ) );
+	printf( "is_integers(5)  : %p\n", (void *) is_integer( null, car( null, tuple ) ) );
+	printf( "is_symbol(d)    : %p\n", (void *) is_symbol( null, cdr( null, tuple ) ) );
 
 	cell * eq = equals( null, integer( null, 5 ), integer( null, 5 ) );
-	dprintf( "equals(5, 5) : %p\n", (void *) eq );
+	printf( "equals(5, 5) : %p\n", (void *) eq );
 	cell * ne = equals( null, integer( null, 5 ), integer( null, 4 ) );
-	dprintf( "equals(5, 4) : %p\n", (void *) ne );
+	printf( "equals(5, 4) : %p\n", (void *) ne );
 	cell * te = equals( null, tuple, tuple );
-	dprintf( "equals(tuple, tuple) : %p\n", (void *) te );
+	printf( "equals(tuple, tuple) : %p\n", (void *) te );
 	cell * tn = equals( null, env, tuple );
-	dprintf( "equals(e, tuple)     : %p\n", (void *) tn );
+	printf( "equals(e, tuple)     : %p\n", (void *) tn );
 
 	env = cons( null, cons( null, symbol( null, 'a' ), integer( null, 0x0a ) ), env );
 	env = cons( null, cons( null, symbol( null, 'b' ), integer( null, 0x0b ) ), env );
 	env = cons( null, cons( null, symbol( null, 'c' ), integer( null, 0x0c ) ), env );
-	dprintf( "environment          : %p\n", env );
+	printf( "environment          : %p\n", env );
 	cell * fs = assq( null, symbol( null, 'b' ), env );
-	dprintf( "assq(b, env), found  : %016lx\n", fs->header );
+	printf( "assq(b, env), found  : %016lx\n", fs->header );
 	cell * nf = assq( null, symbol( null, 'd' ), env );
-	dprintf( "assq(d, env), absent : %016lx\n", nf->header );
+	printf( "assq(d, env), absent : %016lx\n", nf->header );
 
 	return 0;
 }

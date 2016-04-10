@@ -24,8 +24,6 @@
 #define MASK_INTEGER_LO		0x0f00
 #define MASK_OPERATOR		0x00f5
 
-int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
@@ -410,7 +408,7 @@ static cell * eval_list( cell * null, cell * lst, cell * env );
 static cell * apply( cell * null, cell * op, cell * args, cell * env )
 {
 	cell * ans;
-	dprintf( "apply: " ); print( null, op ); dprintf( " to " ); print( null, args ); put_char( '\n' );
+	printf( "apply: " ); print( null, op ); printf( " to " ); print( null, args ); put_char( '\n' );
 	switch( operator_type( op ) )
 	{
 		case CELL_PROCEDURE:
@@ -421,7 +419,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 			break;
 		case CELL_LAMBDA:
 		{
-			dprintf( "apply: ^\n" );
+			printf( "apply: ^\n" );
 			ans  = eval_list( null, args, env );
 			args = ans->car; env = ans->cdr;
 
@@ -433,7 +431,7 @@ static cell * apply( cell * null, cell * op, cell * args, cell * env )
 		}
 		case CELL_FEXPR:
 		{
-			dprintf( "apply: $\n" );
+			printf( "apply: $\n" );
 			cell * fmls = op->operation->cdr->car;
 			cell * body = op->operation->cdr->cdr;
 
@@ -476,20 +474,20 @@ static cell * eval( cell * null, cell * exp, cell * env )
 	switch( cell_type( exp ) )
 	{
 		case CELL_NULL:
-			dprintf( "eval: null\n" );
+			printf( "eval: null\n" );
 			return cons( null, null, env );
 		case CELL_TUPLE:
 		{
-			dprintf( "eval: list\n" );
+			printf( "eval: list\n" );
 			cell * first = exp->car;
 			if( is_symbol( null, first ) is_true )
 			{
-				dprintf( "eval: list, is special?\n" );
+				printf( "eval: list, is special?\n" );
 				switch( symbol_value( first ) )
 				{
 				case '!':
 				{
-					dprintf( "eval: !\n" );
+					printf( "eval: !\n" );
 					cell * key = exp->cdr->car;
 					cell * ans = eval( null, exp->cdr->cdr->car, env );
 					cell * val = ans->car;
@@ -523,7 +521,7 @@ static cell * eval( cell * null, cell * exp, cell * env )
 				}
 				case '?':
 				{
-					dprintf( "eval: ?\n" );
+					printf( "eval: ?\n" );
 					cell * tst = exp->cdr->car;
 					cell * con = exp->cdr->cdr->car;
 					cell * alt = exp->cdr->cdr->cdr->car;
@@ -544,31 +542,31 @@ static cell * eval( cell * null, cell * exp, cell * env )
 				}
 				case '^':
 				{
-					dprintf( "eval: ^\n" );
+					printf( "eval: ^\n" );
 					return cons( null, expression( null, CELL_LAMBDA, exp ), env );
 				}
 				case '$':
 				{
-					dprintf( "eval: $\n" );
+					printf( "eval: $\n" );
 					return cons( null, expression( null, CELL_FEXPR, exp ), env );
 				}
 			}
 			}
 			// else
-			dprintf( "eval: applying " ); print( null, first ); dprintf( " to " ); print( null, exp->cdr ); put_char( '\n' );
+			printf( "eval: applying " ); print( null, first ); printf( " to " ); print( null, exp->cdr ); put_char( '\n' );
 			cell * ans = eval( null, first, env );
-			dprintf( "eval: about to apply " ); print( null, ans->car ); put_char( '\n' );
+			printf( "eval: about to apply " ); print( null, ans->car ); put_char( '\n' );
 			return apply( null, ans->car, exp->cdr, ans->cdr );
 		}
 		case CELL_SYMBOL:
 		{
-			dprintf( "eval: symbol\n" );
+			printf( "eval: symbol\n" );
 			cell * tuple = assq( null, exp, env );
 			cell * value = ( is_tuple( null, tuple ) is_true ) ? tuple->cdr : null;
 			return cons( null, value, env );
 		}
 		case CELL_INTEGER:
-			dprintf( "eval: integer\n" );
+			printf( "eval: integer\n" );
 			return cons( null, exp, env );
 	}
 	quit( 4 );
@@ -580,9 +578,9 @@ static cell * repl( cell * null, cell * env )
 	put_char( '>' ); put_char( ' ' );
 	cell * ans = eval( null, read( null ), env );
 
-	dprintf( "repl: ans: " );
+	printf( "repl: ans: " );
 	print( null, ans->car ); put_char( '\n' );
-	dprintf( "repl: env: " ); print( null, ans->cdr ); put_char( '\n' );
+	printf( "repl: env: " ); print( null, ans->cdr ); put_char( '\n' );
 
 	return repl( null, ans->cdr );
 }

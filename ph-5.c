@@ -24,8 +24,6 @@
 #define MASK_INTEGER_LO		0x0f00
 #define MASK_OPERATOR		0x00f5
 
-int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
@@ -273,7 +271,7 @@ static cell * describe( cell * null, cell * exp )
 
 static cell * link_callees( cell * null, cell * exp, cell * env )
 {
-	dprintf( "link_callees:\n" );
+	printf( "link_callees:\n" );
 	if( exp->address >= null->arena )
 	{
 		unsigned long words = ( exp->header >> 16 ) - 2;
@@ -285,16 +283,16 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 			    ( *( b + 03 ) == 0x00 ) && ( *( b + 04 ) == 0x00 ) &&				// unlinked
 			    ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) )	// call R10
 			{
-				dprintf( "[0x%02x → ", *( b + 2) );
+				printf( "[0x%02x → ", *( b + 2) );
 				cell * tuple = assq( null, symbol( null, *( b + 2 ) ), env );
 				if( tuple != null )
 				{
-					dprintf( "%p] ", tuple->cdr->address );
+					printf( "%p] ", tuple->cdr->address );
 					*( (void **) ( b + 2 ) ) = (void *) tuple->cdr->address;
 				}
 				else
 				{
-					dprintf( "FAIL ]" );
+					printf( "FAIL ]" );
 					quit( 5 );
 				}
 			}
@@ -308,11 +306,11 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 
 static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 {
-	dprintf( "link_callers: to '%c' at %p\n", (int) symbol_value( key ), exp->address );
+	printf( "link_callers: to '%c' at %p\n", (int) symbol_value( key ), exp->address );
 	cell * existing = assq( null, key, env );
 	if( ( existing != null ) && ( equals( null, key, existing->car ) is_true ) )
 	{
-		dprintf( "link_callers: existing at %p\n", existing->cdr->address );
+		printf( "link_callers: existing at %p\n", existing->cdr->address );
 		while( env != null )
 		{
 			cell * tuple = env->car;
@@ -331,7 +329,7 @@ static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 						if( p == existing->cdr->address )
 						{
 							unsigned long s = symbol_value( tuple->car );
-							dprintf( "link_callers: re-linking '%c' (%ld) %p → %p\n",
+							printf( "link_callers: re-linking '%c' (%ld) %p → %p\n",
 								(int) s, s,
 								p, exp->address );
 							toggle_writable( code->address, 1 );

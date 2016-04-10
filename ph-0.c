@@ -13,8 +13,6 @@
 
 #define CELL_INTEGER		0x04
 
-int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c )     ( c->header & MASK_TYPE )
 
 typedef struct _cell cell;
@@ -34,7 +32,7 @@ static cell * allocate( cell * null, unsigned long words )
 {
 	cell * this = null->next;
 	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
-	dprintf( "words: %ld, cell: %p, next: %p\n", words, this, null->next );
+	printf( "words: %ld, cell: %p, next: %p\n", words, this, null->next );
 	return this;
 }
 
@@ -57,9 +55,9 @@ static cell * sire( unsigned long pages )
 	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
 	size->header = ( bytes << 8 ) + CELL_INTEGER;
 	null->size   = size;
-	dprintf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
+	printf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
 
-	dprintf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
+	printf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
 		null->header, null->size->header, (unsigned long) null->arena, (unsigned long) null->next );
 
 	return null;

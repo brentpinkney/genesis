@@ -24,8 +24,6 @@
 #define MASK_INTEGER_LO		0x0f00
 #define MASK_OPERATOR		0x00f5
 
-int verbose = 1;
-#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
