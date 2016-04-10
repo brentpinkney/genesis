@@ -3,7 +3,6 @@
 //
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 
 #define PAGE_SIZE		4096
@@ -166,9 +165,13 @@ static void toggle_writable( void * address, int writable )
 	{
 		quit( 1 );
 	}
+// XXX
+//	printf( "mprotect: PAGE_SIZE= %d, PROT_READ= %d, PROT_EXEC = %d, PROT_WRITE = %d\n",
+//		PAGE_SIZE, PROT_READ, PROT_EXEC, PROT_WRITE );
 }
 
 // functions…
+
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
@@ -313,9 +316,13 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 			{
 				cell * tuple = assq( null, symbol( null, *( b + 2 ) ), env );
 				if( tuple != null )
-					memcpy( b + 2, &( tuple->cdr->address ), WORD_SIZE );
+				{
+					*( (void **) ( b + 2 ) ) = (void *) tuple->cdr->address;
+				}
 				else
+				{
 					quit( 5 );
+				}
 			}
 			i++;
 		}
@@ -326,7 +333,7 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 {
 	cell * existing = assq( null, key, env );
-	if( existing != null )
+	if( ( existing != null ) && ( equals( null, key, existing->car ) is_true ) )
 	{
 		while( env != null )
 		{
@@ -342,12 +349,11 @@ static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 					 || ( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&	// movabs r10,call R10
 					      ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) ) )
 					{
-						void * p;
-						memcpy( &p, b + 2, WORD_SIZE );
+						void * p =  *( (void **) ( b + 2 ) );
 						if( p == existing->cdr->address )
 						{
 							toggle_writable( code->address, 1 );
-							memcpy( b + 2, &( exp->address ), WORD_SIZE );
+							*( (void **) ( b + 2 ) ) = (void *) exp->address;
 							toggle_writable( code->address, 0 );
 						}
 					}

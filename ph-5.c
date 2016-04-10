@@ -3,7 +3,6 @@
 //
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 
 #define PAGE_SIZE		4096
@@ -291,7 +290,7 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 				if( tuple != null )
 				{
 					dprintf( "%p] ", tuple->cdr->address );
-					memcpy( b + 2, &( tuple->cdr->address ), WORD_SIZE );
+					*( (void **) ( b + 2 ) ) = (void *) tuple->cdr->address;
 				}
 				else
 				{
@@ -311,7 +310,7 @@ static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 {
 	dprintf( "link_callers: to '%c' at %p\n", (int) symbol_value( key ), exp->address );
 	cell * existing = assq( null, key, env );
-	if( existing != null )
+	if( ( existing != null ) && ( equals( null, key, existing->car ) is_true ) )
 	{
 		dprintf( "link_callers: existing at %p\n", existing->cdr->address );
 		while( env != null )
@@ -328,8 +327,7 @@ static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 					 || ( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&	// movabs r10,call R10
 					      ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) ) )
 					{
-						void * p;
-						memcpy( &p, b + 2, WORD_SIZE );
+						void * p =  *( (void **) ( b + 2 ) );
 						if( p == existing->cdr->address )
 						{
 							unsigned long s = symbol_value( tuple->car );
@@ -337,7 +335,7 @@ static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 								(int) s, s,
 								p, exp->address );
 							toggle_writable( code->address, 1 );
-							memcpy( b + 2, &( exp->address ), WORD_SIZE );
+							*( (void **) ( b + 2 ) ) = (void *) exp->address;
 							toggle_writable( code->address, 0 );
 						}
 					}
