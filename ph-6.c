@@ -24,8 +24,6 @@
 #define MASK_INTEGER_LO		0x0f00
 #define MASK_OPERATOR		0x00f5
 
-//int verbose = 1;
-//#define dprintf( ... ) if( verbose ) fprintf( stdout,  __VA_ARGS__ )
 #define cell_type( c )     ( c->header & MASK_TYPE )
 #define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
 #define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
@@ -196,23 +194,6 @@ static void toggle_writable( void * address, int writable )
 }
 
 // functions…
-
-// XXX
-/*
-static cell * halt( cell * null, cell * n )
-{
-	printf( "halt\n" );
-	quit( integer_value( n ) );
-	return n;
-}
-static cell * galt( cell * null, cell * n )
-{
-	printf( "galt\n" );
-	halt( null, n );
-	return n;
-}
-*/
-
 static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
@@ -956,12 +937,12 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 0xf7 ), code( null, CELL_PROCEDURE, 1, put_char      , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf6 ), code( null, CELL_PROCEDURE, 0, main          , 0 ) ), env );
 
-	//XXX
-	//env = cons( null, cons( null, symbol( null, 'h'  ), code( null, CELL_FUNCTION,  1, halt          , 0 ) ), env );
-	//env = cons( null, cons( null, symbol( null, 'g'  ), code( null, CELL_FUNCTION,  1, galt          , 0 ) ), env );
-	toggle_writable( main, 1 );
-	toggle_writable( main, 0 );
-
 	repl( null, env );
 	return 0;
+}
+
+void _start( )
+{
+	main( );
+	quit( 0 );
 }

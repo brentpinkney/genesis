@@ -22,7 +22,7 @@ ph-5: ph-5.c
 	gcc $(CFLAGS) $^ -o $@
 
 ph-6: ph-6.c 
-	gcc $(CFLAGS) $^ -o $@
+	gcc $(CFLAGS) -nostdlib $^ -o $@
 
 ph.o: ph.S 
 	gcc $(SFLAGS) $^ -o $@
