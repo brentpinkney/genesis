@@ -87,24 +87,43 @@ static cell * allocate( cell * null, unsigned long words )
 
 static cell * sire( unsigned long pages )
 {
-	unsigned long bytes = PAGE_SIZE * pages;
-	void * arena = mmap(
-			0,
-			bytes,
-			PROT_READ | PROT_WRITE | PROT_EXEC,
-			MAP_ANONYMOUS | MAP_PRIVATE,
-			0, 0 );
-	if( arena == MAP_FAILED ) quit( 1 );
+	asm(	"mov    rbx, rdi\n"			// save 'bytes' in rbx
+		"shl    rbx, 12\n"			// * WORD_SIZE
 
-	cell * null  = arena;				// build null by hand
-	null->header = CELL_NULL;
-	null->arena  = arena;
-	null->next   = arena + ( 4 * WORD_SIZE );
+		"mov    rdi, 0\n"			// preferred address
+		"mov    rsi, rbx\n"			// bytes
+		"mov    rdx, 7\n"			// PROT_READ | PROT_WRITE | PROT_EXEC
+		"mov    rcx, 0x22\n"			// MAP_ANONYMOUS | MAP_PRIVATE
+		"mov    r10, rcx\n"			// 4th argument passed to syscall in r10, sigh
+		"mov    r8,  0\n"			// file descriptor
+		"mov    r9,  0\n"			// file offset
+		"mov    rax, 9\n"			// sys_mmap
+		"syscall\n"
 
-	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
-	size->header = ( bytes << 8 ) + CELL_INTEGER;
-	null->size   = size;
-	return null;
+		"cmp    rax, -1\n"			// MAP_FAILED?
+		"jne    .mapped\n"
+		"mov    rdi, 1\n"			// error no
+	        "call   quit\n"				// moveabs? XXX
+
+		".mapped:\n"
+		"mov    rbp, rax\n"			// save 'arena/null' in rbp
+
+		"mov    QWORD PTR [rbp], 0x01\n"	// null->header = CELL_NULL
+		"mov    QWORD PTR [rbp + 0x10], rbp\n"	// null->arena
+		"lea    rdx, [rbp + 0x20]\n"		// + 4 * WORD_SIZE
+		"mov    QWORD PTR [rax + 0x18], rdx\n"	// null->next
+
+		"mov    rdi, rbp\n"			// null
+		"mov    rsi, 1\n"
+		"call   allocate\n"			// movabs? XXX
+
+		"shl    rbx, 8\n"			// bytes << 8
+		"or     rbx, 0x04\n"			// CELL_INTEGER
+		"mov    QWORD PTR [rax], rbx\n"		// size->header
+
+		"mov    QWORD PTR [rbp + 0x08], rax\n"	// null->size
+		"mov    rax, rbp\n"			// null
+	  	);					// ret added by gcc
 }
 
 static cell * symbol( cell * null, unsigned char c )
@@ -159,18 +178,40 @@ static cell * expression( cell * null, unsigned char type, cell * exp )
 
 static void toggle_writable( void * address, int writable )
 {
-	address -= (unsigned long) address % PAGE_SIZE;
-	int flag = writable? PROT_WRITE : 0;
-	if( mprotect( address, PAGE_SIZE, PROT_READ | PROT_EXEC | flag ) == -1 )
-	{
-		quit( 1 );
-	}
-// XXX
-//	printf( "mprotect: PAGE_SIZE= %d, PROT_READ= %d, PROT_EXEC = %d, PROT_WRITE = %d\n",
-//		PAGE_SIZE, PROT_READ, PROT_EXEC, PROT_WRITE );
+	asm(	"and    edi, 0xffff0000\n"	// address modulo PAGE_SIZE
+		"mov    rdx, 5\n"		// PROT_EXEC & PROT_READ
+		"cmp    rsi, 0\n"		// writable?
+		"je     .ro\n"
+		"or     rdx, 2\n"		// PROT_WRITE
+		".ro:\n"
+		"mov	rsi, 0x1000\n"		// PAGE_SIZE
+		"mov    rax, 10\n"		// sys_mprotect
+		"syscall\n"
+		"cmp    rax, 0\n"		// MAP_FAILED?
+		"je     .ok\n"
+		"mov    rdi, 1\n"		// error no
+	        "call   quit\n"			// moveabs? XXX
+		".ok:\n"
+	  	);				// ret added by gcc
 }
 
 // functions…
+
+// XXX
+/*
+static cell * halt( cell * null, cell * n )
+{
+	printf( "halt\n" );
+	quit( integer_value( n ) );
+	return n;
+}
+static cell * galt( cell * null, cell * n )
+{
+	printf( "galt\n" );
+	halt( null, n );
+	return n;
+}
+*/
 
 static cell * car( cell * null, cell * c ) { return c->car; }
 
@@ -874,6 +915,7 @@ static cell * repl( cell * null, cell * env )
 int main( )
 {
 	cell * null = sire( NUM_PAGES );
+//	printf( "main: sired\n" );
 	cell * env  = null;
 
 	// functions…
@@ -913,6 +955,12 @@ int main( )
 	env = cons( null, cons( null, symbol( null, 0xf8 ), code( null, CELL_PROCEDURE, 0, get_char      , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf7 ), code( null, CELL_PROCEDURE, 1, put_char      , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf6 ), code( null, CELL_PROCEDURE, 0, main          , 0 ) ), env );
+
+	//XXX
+	//env = cons( null, cons( null, symbol( null, 'h'  ), code( null, CELL_FUNCTION,  1, halt          , 0 ) ), env );
+	//env = cons( null, cons( null, symbol( null, 'g'  ), code( null, CELL_FUNCTION,  1, galt          , 0 ) ), env );
+	toggle_writable( main, 1 );
+	toggle_writable( main, 0 );
 
 	repl( null, env );
 	return 0;
