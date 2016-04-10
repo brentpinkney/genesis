@@ -110,10 +110,6 @@ static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
 
-static cell * set_car( cell * null, cell * c, cell * x ) { c->car = x; return x; }
-
-static cell * set_cdr( cell * null, cell * c, cell * x ) { c->cdr = x; return x; }
-
 static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->size : null; }
 
 static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
@@ -498,17 +494,31 @@ static cell * eval( cell * null, cell * exp, cell * env )
 					cell * ans = eval( null, exp->cdr->cdr->car, env );
 					cell * val = ans->car;
 					env = ans->cdr;
+					cell * tuple = cons( null, key, val );
 
-					cell * tuple = assq( null, key, env );
-					if( tuple == null )
+					cell * head = null;
+					cell * rest = env;
+					while( rest != null )
 					{
-						tuple = cons( null, key, val );
+						if( equals( null, key, rest->car->car ) is_true ) break;
+						head = cons( null, rest->car, head );
+						rest = rest->cdr;
+					}
+					if( rest == null )
+					{
 						env = cons( null, tuple, env );
 					}
 					else
 					{
-						set_cdr( null, tuple, val );
+						env = cons( null, tuple, rest->cdr );
+
+						while( head != null )
+						{
+							env = cons( null, head->car, env );
+							head = head->cdr;
+						}
 					}
+
 					return cons( null, tuple, env );
 				}
 				case '?':

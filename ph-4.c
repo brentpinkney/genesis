@@ -118,10 +118,6 @@ static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
 
-static cell * set_car( cell * null, cell * c, cell * x ) { c->car = x; return x; }
-
-static cell * set_cdr( cell * null, cell * c, cell * x ) { c->cdr = x; return x; }
-
 static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->size : null; }
 
 static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
@@ -556,17 +552,31 @@ static cell * eval( cell * null, cell * exp, cell * env )
 					cell * ans = eval( null, exp->cdr->cdr->car, env );
 					cell * val = ans->car;
 					env = ans->cdr;
+					cell * tuple = cons( null, key, val );
 
-					cell * tuple = assq( null, key, env );
-					if( tuple == null )
+					cell * head = null;
+					cell * rest = env;
+					while( rest != null )
 					{
-						tuple = cons( null, key, val );
+						if( equals( null, key, rest->car->car ) is_true ) break;
+						head = cons( null, rest->car, head );
+						rest = rest->cdr;
+					}
+					if( rest == null )
+					{
 						env = cons( null, tuple, env );
 					}
 					else
 					{
-						set_cdr( null, tuple, val );
+						env = cons( null, tuple, rest->cdr );
+
+						while( head != null )
+						{
+							env = cons( null, head->car, env );
+							head = head->cdr;
+						}
 					}
+
 					return cons( null, tuple, env );
 				}
 				case '?':
@@ -634,8 +644,6 @@ int main( )
 	// functions…
 	env = cons( null, cons( null, symbol( null, '#'  ), function( null, 1, car           ) ), env );
 	env = cons( null, cons( null, symbol( null, '%'  ), function( null, 1, cdr           ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x00 ), function( null, 2, set_car       ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x01 ), function( null, 2, set_cdr       ) ), env );
 	env = cons( null, cons( null, symbol( null, '_'  ), function( null, 1, is_null       ) ), env );
 	env = cons( null, cons( null, symbol( null, 't'  ), function( null, 1, is_tuple      ) ), env );
 	env = cons( null, cons( null, symbol( null, 's'  ), function( null, 1, is_symbol     ) ), env );
@@ -644,16 +652,16 @@ int main( )
 	env = cons( null, cons( null, symbol( null, '='  ), function( null, 2, equals        ) ), env );
 	env = cons( null, cons( null, symbol( null, 'q'  ), function( null, 2, assq          ) ), env );
 	env = cons( null, cons( null, symbol( null, '\\' ), function( null, 1, reverse       ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x02 ), function( null, 1, print_integer ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x00 ), function( null, 1, print_integer ) ), env );
 	env = cons( null, cons( null, symbol( null, 'p'  ), function( null, 1, print         ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x03 ), function( null, 1, read_integer  ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x04 ), function( null, 1, read_list     ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x01 ), function( null, 1, read_integer  ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x02 ), function( null, 1, read_list     ) ), env );
 	env = cons( null, cons( null, symbol( null, 'r'  ), function( null, 0, read          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x05 ), function( null, 4, apply_forms   ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x03 ), function( null, 4, apply_forms   ) ), env );
 	env = cons( null, cons( null, symbol( null, '`'  ), function( null, 3, apply         ) ), env );
 	env = cons( null, cons( null, symbol( null, 'o'  ), function( null, 2, eval_list     ) ), env );
 	env = cons( null, cons( null, symbol( null, 'e'  ), function( null, 1, eval          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x06 ), function( null, 1, repl          ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x04 ), function( null, 1, repl          ) ), env );
 
 	repl( null, env );
 	return 0;
