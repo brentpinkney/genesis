@@ -6,6 +6,13 @@ halt:
 	call	r10
 	ret
 
+integer_to_symbol:
+	mov	rbx, QWORD PTR [rsi + 0x02]
+	mov	rsi, rbx
+	movabs	r10, 0xf6 		# symbol()
+	call	r10
+	ret
+	
 add:
 	mov	rcx, QWORD PTR [rsi + 0x02]
 	mov	rsi, QWORD PTR [rdx + 0x02]
