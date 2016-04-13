@@ -50,10 +50,10 @@ static unsigned long get_char( ) { return fgetc( stdin ); }
 static unsigned long put_char( unsigned long c ) { return fputc( c, stdout ); }
 
 /*
-// XXX
+// XXX UTF-8
 static unsigned long symbol_value( cell * s )
 {
-	return ( s->header >> 16 ) & 0x00ffffffffffffff;
+	return ( s->header >> 16 );
 }
 static unsigned long get_char( )
 {
