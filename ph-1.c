@@ -13,14 +13,8 @@
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
 #define MASK_TYPE		0x07
-#define MASK_SYMBOL		0xff00
-#define MASK_INTEGER		0xff00
-#define MASK_INTEGER_HI		0xf000
-#define MASK_INTEGER_LO		0x0f00
-
-#define cell_type( c )     ( c->header & MASK_TYPE )
-#define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
-#define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
+#define MASK_INTEGER_HI		0xf00000
+#define MASK_INTEGER_LO		0x0f0000
 
 #define is_true  != null
 #define is_false == null
@@ -38,6 +32,10 @@ struct _cell
 
 // procedures…
 static void quit( unsigned long n ) { exit( n ); }
+
+static unsigned long cell_type( cell * c )     { return c->header & MASK_TYPE; }
+static unsigned long symbol_value( cell * s )  { return ( s->header >> 16 ) & 0xff; }
+static unsigned long integer_value( cell * s ) { return ( s->header >> 16 ) & 0xff; }
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -64,7 +62,7 @@ static cell * sire( unsigned long pages )
 	null->next   = arena + ( 4 * WORD_SIZE );
 
 	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
-	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	size->header = ( bytes << 16 ) + CELL_INTEGER;
 	null->size   = size;
 	printf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
 
@@ -74,18 +72,18 @@ static cell * sire( unsigned long pages )
 	return null;
 }
 
-static cell * symbol( cell * null, unsigned char c )
+static cell * symbol( cell * null, unsigned long c )
 {
 	cell * i = allocate( null, 1 );
-	i->header = ( c << 8 ) + CELL_SYMBOL;
+	i->header = ( c << 16 ) + CELL_SYMBOL;
 	printf( "c: '%c', %016lx\n", (unsigned char) ( i->header >> 8 ), i->header );
 	return i;
 }
 
-static cell * integer( cell * null, unsigned char n )
+static cell * integer( cell * null, unsigned long n )
 {
 	cell * i = allocate( null, 1 );
-	i->header = ( n << 8 ) + CELL_INTEGER;
+	i->header = ( n << 16 ) + CELL_INTEGER;
 	printf( "n: 0x%02lx, %016lx\n", i->header >> 8, i->header );
 	return i;
 }
@@ -152,6 +150,9 @@ int main( )
 
 	printf( "is_integers(5)  : %p\n", (void *) is_integer( null, car( null, tuple ) ) );
 	printf( "is_symbol(d)    : %p\n", (void *) is_symbol( null, cdr( null, tuple ) ) );
+
+	printf( "integer_value(5)  : 0x%02lx\n", integer_value( car( null, tuple ) ) );
+	printf( "symbol_value('d') : 0x%02lx\n", symbol_value( cdr( null, tuple ) ) );
 
 	cell * eq = equals( null, integer( null, 5 ), integer( null, 5 ) );
 	printf( "equals(5, 5) : %p\n", (void *) eq );

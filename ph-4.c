@@ -18,16 +18,9 @@
 #define CELL_LAMBDA		0x15	// 0001 0011 operative s-expressions
 #define CELL_FEXPR		0x35	// 0011 0011 applicative s-expressions
 #define MASK_TYPE		0x07
-#define MASK_SYMBOL		0xff00
-#define MASK_INTEGER		0xff00
-#define MASK_INTEGER_HI		0xf000
-#define MASK_INTEGER_LO		0x0f00
 #define MASK_OPERATOR		0x00f5
-
-#define cell_type( c )     ( c->header & MASK_TYPE )
-#define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
-#define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
-#define operator_type( c ) ( c->header & MASK_OPERATOR )
+#define MASK_INTEGER_HI		0xf00000
+#define MASK_INTEGER_LO		0x0f0000
 
 #define is_true  != null
 #define is_false == null
@@ -48,9 +41,13 @@ struct _cell
 // procedures…
 static void quit( unsigned long n ) { exit( n ); }
 
-static unsigned char get_char( ) { return fgetc( stdin ); }
+static unsigned long cell_type( cell * c )     { return c->header & MASK_TYPE; }
+static unsigned long operator_type( cell * c ) { return c->header & MASK_OPERATOR; }
+static unsigned long symbol_value( cell * s )  { return ( s->header >> 16 ) & 0xff; }
+static unsigned long integer_value( cell * s ) { return ( s->header >> 16 ) & 0xff; }
 
-static unsigned char put_char( unsigned char c ) { return fputc( c, stdout ); }
+static unsigned long get_char( ) { return fgetc( stdin ); }
+static unsigned long put_char( unsigned long c ) { return fputc( c, stdout ); }
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -76,34 +73,34 @@ static cell * sire( unsigned long pages )
 	null->next   = arena + ( 4 * WORD_SIZE );
 
 	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
-	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	size->header = ( bytes << 16 ) + CELL_INTEGER;
 	null->size   = size;
 	return null;
 }
 
-static cell * symbol( cell * null, unsigned char c )
+static cell * symbol( cell * null, unsigned long c )
 {
 	cell * i = allocate( null, 1 );
-	i->header = ( c << 8 ) + CELL_SYMBOL;
+	i->header = ( c << 16 ) + CELL_SYMBOL;
 	return i;
 }
 
-static cell * integer( cell * null, unsigned char n )
+static cell * integer( cell * null, unsigned long n )
 {
 	cell * i = allocate( null, 1 );
-	i->header = ( n << 8 ) + CELL_INTEGER;
+	i->header = ( n << 16 ) + CELL_INTEGER;
 	return i;
 }
 
-static cell * function( cell * null, unsigned long nargs, void * bytes )
+static cell * code( cell * null, unsigned long type, unsigned long nargs, void * address, cell * bytes )
 {
-	cell * p = allocate( null, 2 );
-	p->header  = ( nargs << 8 ) + CELL_FUNCTION;
-	p->address = bytes;
-	return p;
+	cell * f = allocate( null, 2 );
+	f->header  = ( nargs << 16 ) + type;
+	f->address = address;
+	return f;
 }
 
-static cell * expression( cell * null, unsigned char type, cell * exp )
+static cell * expression( cell * null, unsigned long type, cell * exp )
 {
 	cell * i = allocate( null, 2 );
 	i->header = type;
@@ -164,11 +161,11 @@ static cell * print_integer( cell * null, cell * exp )
 {
 	unsigned long i;
 	put_char( '0' ); put_char( 'x' );
-	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
+	i = ( exp->header & MASK_INTEGER_HI ) >> 20;
 	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
-	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
+	i = ( exp->header & MASK_INTEGER_LO ) >> 16;
 	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
@@ -265,7 +262,7 @@ static cell * print( cell * null, cell * exp )
 					quit( 9 );
 					break;
 				case CELL_FUNCTION:
-					put_char( 'p' ); put_char( '0' + integer_value( exp ) );
+					put_char( 'F' ); put_char( '0' + integer_value( exp ) );
 					break;
 				case CELL_LAMBDA:
 				case CELL_FEXPR:
@@ -279,7 +276,7 @@ static cell * print( cell * null, cell * exp )
 
 static cell * read_integer( cell * null )
 {
-	unsigned char c = get_char( );
+	unsigned long c = get_char( );
 	if( ( c >= '0' ) && ( c <= '9' ) )
 	{
 		c -= '0';
@@ -296,7 +293,7 @@ static cell * read_integer( cell * null )
 		}
 	}
 	c = c << 4;
-	unsigned char d = get_char( );
+	unsigned long d = get_char( );
 	if( ( d >= '0' ) && ( d <= '9' ) )
 	{
 		d -= '0';
@@ -309,7 +306,7 @@ static cell * read_integer( cell * null )
 		}
 	}
 	c += d;
-	return integer( null, (unsigned char) c );
+	return integer( null, c );
 }
 
 static cell * read( cell * null );
@@ -328,7 +325,7 @@ static cell * read_list( cell * null, cell * lst )
 
 static cell * read( cell * null )
 {
-	unsigned char c, d;
+	unsigned long c, d;
 
 	c = get_char( );
 	if( c == ';' )
@@ -364,10 +361,7 @@ static cell * read( cell * null )
 	{
 		return symbol( null, c );
 	}
-	if( ( c >= '!' ) && ( c <= '~' ) ) // printable
-	{
-		return symbol( null, c );
-	}
+	return symbol( null, c ); // may not be printable
 	
 	quit( 2 );
 	return null;
@@ -640,26 +634,26 @@ int main( )
 	cell * env  = null;
 
 	// functions…
-	env = cons( null, cons( null, symbol( null, '#'  ), function( null, 1, car           ) ), env );
-	env = cons( null, cons( null, symbol( null, '%'  ), function( null, 1, cdr           ) ), env );
-	env = cons( null, cons( null, symbol( null, '_'  ), function( null, 1, is_null       ) ), env );
-	env = cons( null, cons( null, symbol( null, 't'  ), function( null, 1, is_tuple      ) ), env );
-	env = cons( null, cons( null, symbol( null, 's'  ), function( null, 1, is_symbol     ) ), env );
-	env = cons( null, cons( null, symbol( null, 'i'  ), function( null, 1, is_integer    ) ), env );
-	env = cons( null, cons( null, symbol( null, '.'  ), function( null, 2, cons          ) ), env );
-	env = cons( null, cons( null, symbol( null, '='  ), function( null, 2, equals        ) ), env );
-	env = cons( null, cons( null, symbol( null, 'q'  ), function( null, 2, assq          ) ), env );
-	env = cons( null, cons( null, symbol( null, '\\' ), function( null, 1, reverse       ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x00 ), function( null, 1, print_integer ) ), env );
-	env = cons( null, cons( null, symbol( null, 'p'  ), function( null, 1, print         ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x01 ), function( null, 1, read_integer  ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x02 ), function( null, 1, read_list     ) ), env );
-	env = cons( null, cons( null, symbol( null, 'r'  ), function( null, 0, read          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x03 ), function( null, 4, apply_forms   ) ), env );
-	env = cons( null, cons( null, symbol( null, '`'  ), function( null, 3, apply         ) ), env );
-	env = cons( null, cons( null, symbol( null, 'o'  ), function( null, 2, eval_list     ) ), env );
-	env = cons( null, cons( null, symbol( null, 'e'  ), function( null, 1, eval          ) ), env );
-	env = cons( null, cons( null, symbol( null, 0x04 ), function( null, 1, repl          ) ), env );
+	env = cons( null, cons( null, symbol( null, '#'  ), code( null, CELL_FUNCTION, 1, car           , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, '%'  ), code( null, CELL_FUNCTION, 1, cdr           , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, '_'  ), code( null, CELL_FUNCTION, 1, is_null       , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 't'  ), code( null, CELL_FUNCTION, 1, is_tuple      , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 's'  ), code( null, CELL_FUNCTION, 1, is_symbol     , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 'i'  ), code( null, CELL_FUNCTION, 1, is_integer    , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, '.'  ), code( null, CELL_FUNCTION, 2, cons          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, '='  ), code( null, CELL_FUNCTION, 2, equals        , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 'q'  ), code( null, CELL_FUNCTION, 2, assq          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, '\\' ), code( null, CELL_FUNCTION, 1, reverse       , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x00 ), code( null, CELL_FUNCTION, 1, print_integer , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 'p'  ), code( null, CELL_FUNCTION, 1, print         , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x01 ), code( null, CELL_FUNCTION, 1, read_integer  , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x02 ), code( null, CELL_FUNCTION, 1, read_list     , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 'r'  ), code( null, CELL_FUNCTION, 0, read          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x03 ), code( null, CELL_FUNCTION, 4, apply_forms   , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, '`'  ), code( null, CELL_FUNCTION, 3, apply         , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 'o'  ), code( null, CELL_FUNCTION, 2, eval_list     , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 'e'  ), code( null, CELL_FUNCTION, 1, eval          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0x04 ), code( null, CELL_FUNCTION, 1, repl          , 0 ) ), env );
 
 	repl( null, env );
 	return 0;

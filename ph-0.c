@@ -13,8 +13,6 @@
 
 #define CELL_INTEGER		0x04
 
-#define cell_type( c )     ( c->header & MASK_TYPE )
-
 typedef struct _cell cell;
 struct _cell
 {
@@ -53,7 +51,7 @@ static cell * sire( unsigned long pages )
 	null->next   = arena + ( 4 * WORD_SIZE );
 
 	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
-	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	size->header = ( bytes << 16 ) + CELL_INTEGER;
 	null->size   = size;
 	printf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
 

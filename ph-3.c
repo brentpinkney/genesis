@@ -18,16 +18,9 @@
 #define CELL_LAMBDA		0x15	// 0001 0011 operative s-expressions
 #define CELL_FEXPR		0x35	// 0011 0011 applicative s-expressions
 #define MASK_TYPE		0x07
-#define MASK_SYMBOL		0xff00
-#define MASK_INTEGER		0xff00
-#define MASK_INTEGER_HI		0xf000
-#define MASK_INTEGER_LO		0x0f00
 #define MASK_OPERATOR		0x00f5
-
-#define cell_type( c )     ( c->header & MASK_TYPE )
-#define symbol_value( s )  ( ( s->header & MASK_SYMBOL )  >> 8 )
-#define integer_value( s ) ( ( s->header & MASK_INTEGER ) >> 8 )
-#define operator_type( c ) ( c->header & MASK_OPERATOR )
+#define MASK_INTEGER_HI		0xf00000
+#define MASK_INTEGER_LO		0x0f0000
 
 #define is_true  != null
 #define is_false == null
@@ -48,9 +41,13 @@ struct _cell
 // procedures…
 static void quit( unsigned long n ) { exit( n ); }
 
-static unsigned char get_char( ) { return fgetc( stdin ); }
+static unsigned long cell_type( cell * c )     { return c->header & MASK_TYPE; }
+static unsigned long operator_type( cell * c ) { return c->header & MASK_OPERATOR; }
+static unsigned long symbol_value( cell * s )  { return ( s->header >> 16 ) & 0xff; }
+static unsigned long integer_value( cell * s ) { return ( s->header >> 16 ) & 0xff; }
 
-static unsigned char put_char( unsigned char c ) { return fputc( c, stdout ); }
+static unsigned long get_char( ) { return fgetc( stdin ); }
+static unsigned long put_char( unsigned long c ) { return fputc( c, stdout ); }
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -76,22 +73,22 @@ static cell * sire( unsigned long pages )
 	null->next   = arena + ( 4 * WORD_SIZE );
 
 	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
-	size->header = ( bytes << 8 ) + CELL_INTEGER;
+	size->header = ( bytes << 16 ) + CELL_INTEGER;
 	null->size   = size;
 	return null;
 }
 
-static cell * symbol( cell * null, unsigned char c )
+static cell * symbol( cell * null, unsigned long c )
 {
 	cell * i = allocate( null, 1 );
-	i->header = ( c << 8 ) + CELL_SYMBOL;
+	i->header = ( c << 16 ) + CELL_SYMBOL;
 	return i;
 }
 
-static cell * integer( cell * null, unsigned char n )
+static cell * integer( cell * null, unsigned long n )
 {
 	cell * i = allocate( null, 1 );
-	i->header = ( n << 8 ) + CELL_INTEGER;
+	i->header = ( n << 16 ) + CELL_INTEGER;
 	return i;
 }
 
@@ -156,11 +153,11 @@ static cell * print_integer( cell * null, cell * exp )
 {
 	unsigned long i;
 	put_char( '0' ); put_char( 'x' );
-	i = ( exp->header & MASK_INTEGER_HI ) >> 12;
+	i = ( exp->header & MASK_INTEGER_HI ) >> 20;
 	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
-	i = ( exp->header & MASK_INTEGER_LO ) >> 8;
+	i = ( exp->header & MASK_INTEGER_LO ) >> 16;
 	i += ( i > 0x09 ) ? ( 'a' - 10 ) : '0';
 	put_char( i );
 
@@ -257,7 +254,7 @@ static cell * print( cell * null, cell * exp )
 					quit( 9 );
 					break;
 				case CELL_FUNCTION:
-					put_char( 'p' ); put_char( '0' + integer_value( exp ) );
+					put_char( 'F' ); put_char( '0' + integer_value( exp ) );
 					break;
 				case CELL_LAMBDA:
 				case CELL_FEXPR:
@@ -271,7 +268,7 @@ static cell * print( cell * null, cell * exp )
 
 static cell * read_integer( cell * null )
 {
-	unsigned char c = get_char( );
+	unsigned long c = get_char( );
 	if( ( c >= '0' ) && ( c <= '9' ) )
 	{
 		c -= '0';
@@ -288,7 +285,7 @@ static cell * read_integer( cell * null )
 		}
 	}
 	c = c << 4;
-	unsigned char d = get_char( );
+	unsigned long d = get_char( );
 	if( ( d >= '0' ) && ( d <= '9' ) )
 	{
 		d -= '0';
@@ -301,7 +298,7 @@ static cell * read_integer( cell * null )
 		}
 	}
 	c += d;
-	return integer( null, (unsigned char) c );
+	return integer( null, c );
 }
 
 static cell * read( cell * null );
@@ -320,7 +317,7 @@ static cell * read_list( cell * null, cell * lst )
 
 static cell * read( cell * null )
 {
-	unsigned char c, d;
+	unsigned long c, d;
 
 	c = get_char( );
 	if( c == ';' )
@@ -356,10 +353,7 @@ static cell * read( cell * null )
 	{
 		return symbol( null, c );
 	}
-	if( ( c >= '!' ) && ( c <= '~' ) ) // printable
-	{
-		return symbol( null, c );
-	}
+	return symbol( null, c ); // may not be printable
 	
 	quit( 2 );
 	return null;
