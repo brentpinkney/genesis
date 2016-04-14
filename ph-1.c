@@ -12,7 +12,7 @@
 #define CELL_TUPLE		0x02
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
-#define MASK_TYPE		0x07
+#define MASK_TYPE		0x0f	// 0000 1111
 #define MASK_INTEGER_HI		0xf00000
 #define MASK_INTEGER_LO		0x0f0000
 

@@ -12,13 +12,13 @@
 #define CELL_TUPLE		0x02
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
-#define CELL_OPERATOR		0x05	// 0000 0011
-#define CELL_PROCEDURE		0x05	// 0000 0011 machine language, REPL access
-#define CELL_FUNCTION		0x25	// 0010 0011 machine language, no REPL access
-#define CELL_LAMBDA		0x15	// 0001 0011 operative s-expressions
-#define CELL_FEXPR		0x35	// 0011 0011 applicative s-expressions
-#define MASK_TYPE		0x07
-#define MASK_OPERATOR		0x00f5
+#define CELL_OPERATOR		0x05	// 0000 0101
+#define CELL_PROCEDURE		0x05	// 0000 0101 machine language, REPL access
+#define CELL_FUNCTION		0x25	// 0010 0101 machine language, no REPL access
+#define CELL_LAMBDA		0x15	// 0001 0101 operative s-expressions
+#define CELL_FEXPR		0x35	// 0011 0101 applicative s-expressions
+#define MASK_TYPE		0x0f	// 0000 1111
+#define MASK_OPERATOR		0x00f5	// 1111 0101
 #define MASK_INTEGER_HI		0xf00000
 #define MASK_INTEGER_LO		0x0f0000
 
