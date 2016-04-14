@@ -12,13 +12,13 @@
 #define CELL_TUPLE		0x02
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
-#define CELL_OPERATOR		0x05	// 0000 0011
-#define CELL_PROCEDURE		0x05	// 0000 0011 machine language, REPL access
-#define CELL_FUNCTION		0x25	// 0010 0011 machine language, no REPL access
-#define CELL_LAMBDA		0x15	// 0001 0011 operative s-expressions
-#define CELL_FEXPR		0x35	// 0011 0011 applicative s-expressions
-#define MASK_TYPE		0x07
-#define MASK_OPERATOR		0x00f5
+#define CELL_OPERATOR		0x05	// 0000 0101
+#define CELL_PROCEDURE		0x05	// 0000 0101 machine language, REPL access
+#define CELL_FUNCTION		0x25	// 0010 0101 machine language, no REPL access
+#define CELL_LAMBDA		0x15	// 0001 0101 operative s-expressions
+#define CELL_FEXPR		0x35	// 0011 0101 applicative s-expressions
+#define MASK_TYPE		0x0f	// 0000 1111
+#define MASK_OPERATOR		0x00f5	// 1111 0101
 #define MASK_INTEGER_HI		0xf00000
 #define MASK_INTEGER_LO		0x0f0000
 
@@ -48,31 +48,6 @@ static unsigned long integer_value( cell * s ) { return ( s->header >> 16 ) & 0x
 
 static unsigned long get_char( ) { return fgetc( stdin ); }
 static unsigned long put_char( unsigned long c ) { return fputc( c, stdout ); }
-
-/*
-// XXX UTF-8
-static unsigned long symbol_value( cell * s )
-{
-	return ( s->header >> 16 );
-}
-static unsigned long get_char( )
-{
-	unsigned char c = fgetc( stdin );
-	short d, n = 0;
-	do d = ( c << ++n ) & 0x0100; while( d );
-	n = ( n < 2 ) ? 0 : n - 2;
-
-	char m = 1;
-	unsigned long e = c;
-	while( n-- > 0 ) e = e + ( fgetc( stdin ) << ( 8 * m++ ) );
-	return e;
-}
-
-static unsigned long put_char( unsigned long c )
-{
-	return fputs( (const char *) &c, stdout );
-}
-*/
 
 static cell * allocate( cell * null, unsigned long words )
 {
@@ -157,7 +132,7 @@ static void toggle_writable( void * address, int writable )
 {
 	address -= (unsigned long) address % PAGE_SIZE;
 	int flag = writable? PROT_WRITE : 0;
-	if( mprotect( address, PAGE_SIZE, PROT_READ | PROT_EXEC | flag ) == -1 )
+	if( mprotect( address, PAGE_SIZE * 2, PROT_READ | PROT_EXEC | flag ) == -1 )
 	{
 		quit( 1 );
 	}
@@ -230,8 +205,8 @@ static cell * describe( cell * null, cell * exp )
 	{
 		case CELL_NULL:
 		{
-			unsigned long size = integer_value( exp->size );
-			printf( "null\nsize:      0x%08lx\t\tarena:%16p\t\tnext:%16p", size, exp->arena, exp->next );
+			unsigned long size = exp->size->header >> 16; // not integer_value()
+			printf( "null\nsize:      0x%016lx\tarena:%16p\t\tnext:%16p", size, exp->arena, exp->next );
 			printf( "\tused: %.2f%%\n", ( exp->next - exp->arena ) * 100.0 / size );
 			break;
 		}
@@ -298,14 +273,14 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 	{
 		unsigned long words = ( exp->header >> 24 ) - 2;
 		unsigned long bytes = words * WORD_SIZE;
-		for( unsigned long i = 0; i < bytes; )
+		for( unsigned long i = 0; i < bytes - 12; )
 		{
 			unsigned char * b = exp->bytes + i;
 			if( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&				// movabs R10
 			    ( *( b + 03 ) == 0x00 ) && ( *( b + 04 ) == 0x00 ) &&				// unlinked
 			    ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) )	// call R10
 			{
-				printf( "[0x%02x → ", *( b + 2) );
+				printf( "[0x%02x → ", (unsigned char) *( b + 2 ) );
 				cell * tuple = assq( null, symbol( null, *( b + 2 ) ), env );
 				if( tuple != null )
 				{
@@ -328,32 +303,29 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 
 static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 {
-	printf( "link_callers: to '%c' at %p\n", (int) symbol_value( key ), exp->address );
+	unsigned long val = symbol_value( key );
+	printf( "link_callers: to '%c' (%016lx) at %p\n", (int) val, val, exp->address );
 	cell * existing = assq( null, key, env );
 	if( ( existing != null ) && ( equals( null, key, existing->car ) is_true ) )
 	{
-		printf( "link_callers: existing at %p\n", existing->cdr->address );
+		unsigned long ext = symbol_value( existing->car );
+		printf( "link_callers: existing '%c' (%016lx) at %p\n", (int) ext, ext, existing->cdr->address );
 		while( env != null )
 		{
 			cell * tuple = env->car;
 			cell * code  = tuple->cdr;
-			if( ( cell_type( code ) == CELL_PROCEDURE ) || ( cell_type( code ) == CELL_FUNCTION ) )
+			if( ( operator_type( code ) == CELL_PROCEDURE ) || ( operator_type( code ) == CELL_FUNCTION ) )
 			{
+				unsigned long sym = symbol_value( tuple->car );
 				unsigned char * b = code->address;
 				while( *b != 0xc3 ) // ret
 				{
-					if( ( ( *( b + 00 ) == 0x48 ) && ( *( b + 01 ) == 0xb8 ) &&	// movabs rax,…
-					      ( *( b + 10 ) == 0xff ) && ( *( b + 11 ) == 0xd0 ) )	// call   rax
-					 || ( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&	// movabs r10,call R10
-					      ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) ) )
+					if( ( ( *b == 0x48 ) || ( *b == 0x49 ) ) && ( *( b + 10 ) == 0xff ) )		// movabsi, call   
 					{
 						void * p =  *( (void **) ( b + 2 ) );
 						if( p == existing->cdr->address )
 						{
-							unsigned long s = symbol_value( tuple->car );
-							printf( "link_callers: re-linking '%c' (%ld) %p → %p\n",
-								(int) s, s,
-								p, exp->address );
+							printf( "link_callers: re-linking '%c' (%016lx) %p → %p\n", (int) sym, sym, p, exp->address );
 							toggle_writable( code->address, 1 );
 							*( (void **) ( b + 2 ) ) = (void *) exp->address;
 							toggle_writable( code->address, 0 );
@@ -757,12 +729,20 @@ static cell * eval( cell * null, cell * exp, cell * env )
 				{
 				case '!':
 				{
-					cell * key = exp->cdr->car;
-					cell * ans = eval( null, exp->cdr->cdr->car, env );
-					cell * val = ans->car;
+					cell * key, * ans, * val;
+					key = exp->cdr->car;
+					if( cell_type( key ) != CELL_SYMBOL )
+					{
+						ans = eval( null, key, env );
+						key = ans->car;
+						env = ans->cdr;
+						if( cell_type( key ) != CELL_SYMBOL ) quit( 4 );
+					}
+					ans = eval( null, exp->cdr->cdr->car, env );
+					val = ans->car;
 					env = ans->cdr;
 
-					if( ( cell_type( val ) == CELL_PROCEDURE ) || ( cell_type( val ) == CELL_FUNCTION ) )
+					if( ( operator_type( val ) == CELL_PROCEDURE ) || ( operator_type( val ) == CELL_FUNCTION ) )
 					{
 						link_callers( null, key, val, env );
 					}

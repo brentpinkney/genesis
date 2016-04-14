@@ -9,13 +9,13 @@
 #define CELL_TUPLE		0x02
 #define CELL_SYMBOL		0x03
 #define CELL_INTEGER		0x04
-#define CELL_OPERATOR		0x05	// 0000 0011
-#define CELL_PROCEDURE		0x05	// 0000 0011 machine language, REPL access
-#define CELL_FUNCTION		0x25	// 0010 0011 machine language, no REPL access
-#define CELL_LAMBDA		0x15	// 0001 0011 operative s-expressions
-#define CELL_FEXPR		0x35	// 0011 0011 applicative s-expressions
-#define MASK_TYPE		0x07
-#define MASK_OPERATOR		0x00f5
+#define CELL_OPERATOR		0x05	// 0000 0101
+#define CELL_PROCEDURE		0x05	// 0000 0101 machine language, REPL access
+#define CELL_FUNCTION		0x25	// 0010 0101 machine language, no REPL access
+#define CELL_LAMBDA		0x15	// 0001 0101 operative s-expressions
+#define CELL_FEXPR		0x35	// 0011 0101 applicative s-expressions
+#define MASK_TYPE		0x0f	// 0000 1111
+#define MASK_OPERATOR		0x00f5	// 1111 0101
 #define MASK_INTEGER_HI		0xf00000
 #define MASK_INTEGER_LO		0x0f0000
 
@@ -38,8 +38,9 @@ struct _cell
 // procedures…
 static void quit( unsigned long n )		// exit( n );
 {
-	asm(	"mov eax, 0x3c\n"		// sys_exit
-		"syscall" );
+	asm(	"mov eax, 0x3c			# sys_exit			\n"
+		"syscall							\n"
+	);
 }
 
 static unsigned long cell_type( cell * c )     { return c->header & MASK_TYPE; }
@@ -49,26 +50,26 @@ static unsigned long integer_value( cell * s ) { return ( s->header >> 16 ) & 0x
 
 static unsigned long get_char( )		// return fgetc( stdin );
 {
-	asm(	"mov  rdi, 0\n"			// stdin
-		"push rdi\n"			// must read into memory
-		"lea  rsi, [rsp]\n"		// address of local variable
-		"mov  rdx, 1\n"			// one byte
-		"mov  rax, 0\n"			// sys_read
-		"syscall\n"
-		"pop  rax\n"			// restore
-	  	);				// ret added by gcc
+	asm(	"mov  rdi, 0			# stdin				\n"
+		"push rdi			# must read into memory		\n"
+		"lea  rsi, [rsp]		# address of local variable	\n"
+		"mov  rdx, 1			# one byte			\n"
+		"mov  rax, 0			# sys_read			\n"
+		"syscall							\n"
+		"pop  rax			# restore			\n"
+	  	);
 }
 
 static unsigned long put_char( unsigned long c ) // return fputc( c, stdout );
 {
-	asm(	"push rdi\n"			// must write from memory
-		"mov  rdi, 1\n"			// stdout
-		"lea  rsi, [rsp]\n"		// address of local variable
-		"mov  rdx, 1\n"			// one byte
-		"mov  rax, 1\n"			// sys_write
-		"syscall\n"
-		"pop  rax\n"			// ans
-	  	);				// ret added by gcc
+	asm(	"push rdi			# must write from memory	\n"
+		"mov  rdi, 1			# stdout			\n"
+		"lea  rsi, [rsp]		# address of local variable	\n"
+		"mov  rdx, 1			# one byte			\n"
+		"mov  rax, 1			# sys_write			\n"
+		"syscall							\n"
+		"pop  rax			# restore			\n"
+	  	);
 }
 
 static cell * allocate( cell * null, unsigned long words )
@@ -80,43 +81,43 @@ static cell * allocate( cell * null, unsigned long words )
 
 static cell * sire( unsigned long pages )
 {
-	asm(	"mov    rbx, rdi\n"			// save 'bytes' in rbx
-		"shl    rbx, 12\n"			// * WORD_SIZE
+	asm(	"mov    rbx, rdi			# save 'bytes' in rbx			\n"
+		"shl    rbx, 12				# * WORD_SIZE				\n"
 
-		"mov    rdi, 0\n"			// preferred address
-		"mov    rsi, rbx\n"			// bytes
-		"mov    rdx, 7\n"			// PROT_READ | PROT_WRITE | PROT_EXEC
-		"mov    rcx, 0x22\n"			// MAP_ANONYMOUS | MAP_PRIVATE
-		"mov    r10, rcx\n"			// 4th argument passed to syscall in r10, sigh
-		"mov    r8,  0\n"			// file descriptor
-		"mov    r9,  0\n"			// file offset
-		"mov    rax, 9\n"			// sys_mmap
-		"syscall\n"
+		"mov    rdi, 0				# preferred address			\n"
+		"mov    rsi, rbx			# bytes					\n"
+		"mov    rdx, 7				# PROT_READ | PROT_WRITE | PROT_EXEC	\n"
+		"mov    rcx, 0x22			# MAP_ANONYMOUS | MAP_PRIVATE		\n"
+		"mov    r10, rcx			# 4th argument in r10, sigh		\n"
+		"mov    r8,  0				# file descriptor			\n"
+		"mov    r9,  0				# file offset				\n"
+		"mov    rax, 9				# sys_mmap				\n"
+		"syscall									\n"
 
-		"cmp    rax, -1\n"			// MAP_FAILED?
-		"jne    .mapped\n"
-		"mov    rdi, 1\n"			// error no
-	        "call   quit\n"				// moveabs? XXX
+		"cmp    rax, -1				# MAP_FAILED?				\n"
+		"jne    .mapped									\n"
+		"mov    rdi, 1				# error no				\n"
+	        "call   quit				# moveabs? XXX				\n"
 
-		".mapped:\n"
-		"mov    rbp, rax\n"			// save 'arena/null' in rbp
+		".mapped:									\n"
+		"mov    rbp, rax			# save 'arena/null' in rbp		\n"
 
-		"mov    QWORD PTR [rbp], 0x01\n"	// null->header = CELL_NULL
-		"mov    QWORD PTR [rbp + 0x10], rbp\n"	// null->arena
-		"lea    rdx, [rbp + 0x20]\n"		// + 4 * WORD_SIZE
-		"mov    QWORD PTR [rax + 0x18], rdx\n"	// null->next
+		"mov    QWORD PTR [rbp], 0x01		# null->header = CELL_NULL		\n"
+		"mov    QWORD PTR [rbp + 0x10], rbp	# null->arena				\n"
+		"lea    rdx, [rbp + 0x20]		# + 4 * WORD_SIZE			\n"
+		"mov    QWORD PTR [rax + 0x18], rdx	# null->next				\n"
 
-		"mov    rdi, rbp\n"			// null
-		"mov    rsi, 1\n"
-		"call   allocate\n"			// movabs? XXX
+		"mov    rdi, rbp			# null					\n"
+		"mov    rsi, 1									\n"
+		"call   allocate			# movabs? XXX				\n"
 
-		"shl    rbx, 16\n"			// bytes << 8
-		"or     rbx, 0x04\n"			// CELL_INTEGER
-		"mov    QWORD PTR [rax], rbx\n"		// size->header
+		"shl    rbx, 16				# bytes << 8				\n"
+		"or     rbx, 0x04			# CELL_INTEGER				\n"
+		"mov    QWORD PTR [rax], rbx		# size->header				\n"
 
-		"mov    QWORD PTR [rbp + 0x08], rax\n"	// null->size
-		"mov    rax, rbp\n"			// null
-	  	);					// ret added by gcc
+		"mov    QWORD PTR [rbp + 0x08], rax	# null->size				\n"
+		"mov    rax, rbp			# null					\n"
+	  	);
 }
 
 static cell * symbol( cell * null, unsigned long c )
@@ -171,21 +172,21 @@ static cell * expression( cell * null, unsigned long type, cell * exp )
 
 static void toggle_writable( void * address, int writable )
 {
-	asm(	"and    edi, 0xffff0000\n"	// address modulo PAGE_SIZE
-		"mov    rdx, 5\n"		// PROT_EXEC & PROT_READ
-		"cmp    rsi, 0\n"		// writable?
-		"je     .ro\n"
-		"or     rdx, 2\n"		// PROT_WRITE
-		".ro:\n"
-		"mov	rsi, 0x1000\n"		// PAGE_SIZE
-		"mov    rax, 10\n"		// sys_mprotect
-		"syscall\n"
-		"cmp    rax, 0\n"		// MAP_FAILED?
-		"je     .ok\n"
-		"mov    rdi, 1\n"		// error no
-	        "call   quit\n"			// moveabs? XXX
-		".ok:\n"
-	  	);				// ret added by gcc
+	asm(	"and    edi, 0xfffff000		# address modulo PAGE_SIZE	\n"
+		"mov    rdx, 5			# PROT_EXEC & PROT_READ		\n"
+		"cmp    rsi, 0			# writable?			\n"
+		"je     .ro							\n"
+		"or     rdx, 2			# PROT_WRITE			\n"
+		".ro:								\n"
+		"mov	rsi, 0x2000		# PAGE_SIZE * 2			\n"
+		"mov    rax, 10			# sys_mprotect			\n"
+		"syscall							\n"
+		"cmp    rax, 0			# MAP_FAILED?			\n"
+		"je     .ok							\n"
+		"mov    rdi, 1			# error no			\n"
+	        "call   quit			# moveabs? XXX			\n"
+		".ok:								\n"
+	  	);
 }
 
 // functions…
@@ -254,7 +255,7 @@ static cell * link_callees( cell * null, cell * exp, cell * env )
 	{
 		unsigned long words = ( exp->header >> 24 ) - 2;
 		unsigned long bytes = words * WORD_SIZE;
-		for( unsigned long i = 0; i < bytes; )
+		for( unsigned long i = 0; i < bytes - 12; )
 		{
 			unsigned char * b = exp->bytes + i;
 			if( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&				// movabs R10
@@ -286,15 +287,12 @@ static cell * link_callers( cell * null, cell * key, cell * exp, cell * env )
 		{
 			cell * tuple = env->car;
 			cell * code  = tuple->cdr;
-			if( ( cell_type( code ) == CELL_PROCEDURE ) || ( cell_type( code ) == CELL_FUNCTION ) )
+			if( ( operator_type( code ) == CELL_PROCEDURE ) || ( operator_type( code ) == CELL_FUNCTION ) )
 			{
 				unsigned char * b = code->address;
 				while( *b != 0xc3 ) // ret
 				{
-					if( ( ( *( b + 00 ) == 0x48 ) && ( *( b + 01 ) == 0xb8 ) &&	// movabs rax,…
-					      ( *( b + 10 ) == 0xff ) && ( *( b + 11 ) == 0xd0 ) )	// call   rax
-					 || ( ( *( b + 00 ) == 0x49 ) && ( *( b + 01 ) == 0xba ) &&	// movabs r10,call R10
-					      ( *( b + 10 ) == 0x41 ) && ( *( b + 11 ) == 0xff ) && ( *( b + 12 ) == 0xd2 ) ) )
+					if( ( ( *b == 0x48 ) || ( *b == 0x49 ) ) && ( *( b + 10 ) == 0xff ) )		// movabs, call   
 					{
 						void * p =  *( (void **) ( b + 2 ) );
 						if( p == existing->cdr->address )
@@ -702,12 +700,20 @@ static cell * eval( cell * null, cell * exp, cell * env )
 				{
 				case '!':
 				{
-					cell * key = exp->cdr->car;
-					cell * ans = eval( null, exp->cdr->cdr->car, env );
-					cell * val = ans->car;
+					cell * key, * ans, * val;
+					key = exp->cdr->car;
+					if( cell_type( key ) != CELL_SYMBOL )
+					{
+						ans = eval( null, key, env );
+						key = ans->car;
+						env = ans->cdr;
+						if( cell_type( key ) != CELL_SYMBOL ) quit( 4 );
+					}
+					ans = eval( null, exp->cdr->cdr->car, env );
+					val = ans->car;
 					env = ans->cdr;
 
-					if( ( cell_type( val ) == CELL_PROCEDURE ) || ( cell_type( val ) == CELL_FUNCTION ) )
+					if( ( operator_type( val ) == CELL_PROCEDURE ) || ( operator_type( val ) == CELL_FUNCTION ) )
 					{
 						link_callers( null, key, val, env );
 					}
