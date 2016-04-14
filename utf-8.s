@@ -37,40 +37,42 @@ getchar:
 	mov	rax, 0		# sys_read
 	syscall
 
-	mov	rbx, [rsp]	# byte read
-	mov	rcx, 1
+	mov	rax, [rsp]	# byte read
+	mov	rcx, 0
 glen:
-	shl	rbx, cl
-	and	rbx, 0x01ff
-	cmp	bh, 0
+	shl	rax, 1
+	and	rax, 0x01ff
+	cmp	ah, 0
 	jz	gread
 	inc	cl
 	jmp	glen
 gread:
-	mov	rbx, [rsp]	# reload first byte
-	cmp	cl,  1
+	mov	r8,  [rsp]	# accumulator
+	cmp	cl,  0
 	je	gdone
 	dec	cl
-	mov	r15, rcx
-	mov	r14, 0		# cl to shl, but rcx clobbered
+	mov	r9,  rcx	# loop
+	mov	r10, 0		# shifter
 gmore:
-	cmp	r15, 0
+	cmp	r9, 0
 	jz	gdone
 	mov	rdi, 0		# stdin
 	lea	rsi, [rsp]	# address
 	mov	rdx, 1		# length
 	mov	rax, 0		# sys_read
 	syscall
-	mov	rbp, [rsp]	# temp
-	add	r14, 8
-	mov	rcx, r14
-	shl	rbp, cl
-	add	rbx, rbp
-	dec	r15
+	mov	r11, [rsp]	# temp
+	add	r10, 8		# shifter
+	mov	rcx, r10
+	shl	r11, cl
+	add	r8,  r11
+	dec	r9
 	jmp	gmore
 gdone:
-	mov	rax, rbx
+	mov	rax, r8
 	pop	rdi
+
+
 	ret
 
 main:
