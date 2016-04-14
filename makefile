@@ -1,4 +1,4 @@
-CFLAGS =-m64 -masm=intel -mcmodel=large -std=gnu99 -O2 -Wall -D_BSD_SOURCE
+CFLAGS =-m64 -masm=intel -mcmodel=large -std=gnu99 -O0 -Wall -D_BSD_SOURCE
 SFLAGS =-m64 -masm=intel -mcmodel=large
 
 all: ph-0 ph-1 ph-2 ph-3 ph-4 ph-5 ph-6 ph.o utf-8
@@ -19,10 +19,10 @@ ph-4: ph-4.c
 	gcc $(CFLAGS) $^ -o $@
 
 ph-5: ph-5.c 
-	gcc $(CFLAGS) $^ -o $@
+	gcc $(CFLAGS) $^ -g -o $@
 
 ph-6: ph-6.c 
-	gcc -m64 -masm=intel -mcmodel=large -std=gnu99 -O0 -Wall -nostdlib $^ -o $@
+	gcc $(CFLAGS) $^ -nostdlib -o $@
 	strip -R .comment -R .note.gnu.build-id $@
 
 ph.o: ph.s 
