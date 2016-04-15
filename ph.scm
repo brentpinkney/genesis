@@ -15,7 +15,7 @@
        0x41 0xff 0xd2						; call   r10
        0xc3))							; ret
 
-;;; (cN) (convert n) integer → symbol
+;;; (uN) (utf-8 n) integer → symbol
 (!c (@ 0x25							; function
        0x01							; n
        0x48 0x8b 0x5e 0x02					; mov    rbx, QWORD PTR [rsi+0x2]

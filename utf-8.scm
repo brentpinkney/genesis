@@ -2,7 +2,7 @@
 ;;; utf-8 → reflection 
 ;;; -----------------------------------------------------------------------------------------------
 ;;; symbol_value( s )
-(! (c 0xfc)
+(! (u 0xfc)
    (@ 0x05							; procedure
       0x01							; s
       0x48 0x8b 0x07						; mov    rax, QWORD PTR [rdi]
@@ -10,7 +10,7 @@
       0xc3)) 							; ret 
 
 ;;; put_char( c )
-(! (c 0xf9)
+(! (u 0xf9)
    (@ 0x05							; procedure
       0x01							; c 
       ; put_char:
@@ -32,7 +32,7 @@
 
 
 ;;; get_char( )
-(! (c 0xfa)
+(! (u 0xfa)
    (@ 0x05							; procedure
       0x00							; none
       ; get_char:
