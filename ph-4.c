@@ -31,7 +31,7 @@ struct _cell
 	unsigned long header;
 	union
 	{
-		struct { cell * zero; void * arena, * extent, * next; };
+		struct { void * zero, * arena, * extent, * next; };
 		struct { cell * car, * cdr; };
 		struct { cell * operation; };
 		struct { void * address; };
@@ -73,7 +73,7 @@ static cell * sire( unsigned long pages )
 	null->arena  = arena;
 	null->extent = arena + bytes;
 	null->next   = arena + ( 5 * WORD_SIZE );
-	null->zero   = (cell *) CELL_INTEGER;		// a cell that is not null
+	null->zero   = (void *) CELL_INTEGER;		// a cell that is not null
 
 	return null;
 }
@@ -113,13 +113,13 @@ static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
 
-static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->zero : null; }
+static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? (cell*) &null->zero : null; }
 
-static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->zero : null; }
+static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? (cell*) &null->zero : null; }
 
-static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->zero : null; }
+static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? (cell*) &null->zero : null; }
 
-static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->zero : null; }
+static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? (cell*) &null->zero : null; }
 
 static cell * cons( cell * null, cell * a, cell * b )
 {
@@ -133,8 +133,8 @@ static cell * cons( cell * null, cell * a, cell * b )
 static cell * equals( cell * null, cell * a, cell * b )
 {
 	return ( ( is_tuple( null, a ) is_true ) || ( is_tuple( null, b ) is_true ) )
-		? ( a == b ) ? null->zero : null
-		: ( a->header == b->header ) ? null->zero : null;
+		? ( a == b ) ? (cell *) &null->zero : null
+		: ( a->header == b->header ) ? (cell *) &null->zero : null;
 }
 
 static cell * assq( cell * null, cell * key, cell * alist )
