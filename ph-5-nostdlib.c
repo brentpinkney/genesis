@@ -28,7 +28,7 @@ struct _cell
 	unsigned long header;
 	union
 	{
-		struct { cell * size; void * arena, * next; };
+		struct { cell * zero; void * arena, * extent, * next; };
 		struct { cell * car, * cdr; };
 		struct { cell * operation; };
 		struct { void * address; unsigned char bytes[]; };
@@ -76,6 +76,7 @@ static cell * allocate( cell * null, unsigned long words )
 {
 	cell * this = null->next;
 	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
+	if( null->next > null->extent ) quit( 2 );
 	return this;
 }
 
@@ -103,19 +104,14 @@ static cell * sire( unsigned long pages )
 		"mov    rbp, rax			# save 'arena/null' in rbp		\n"
 
 		"mov    QWORD PTR [rbp], 0x01		# null->header = CELL_NULL		\n"
+		"mov    QWORD PTR [rbp + 0x08], 0x04	# null->zero->header = CELL_INTEGER	\n"
 		"mov    QWORD PTR [rbp + 0x10], rbp	# null->arena				\n"
-		"lea    rdx, [rbp + 0x20]		# + 4 * WORD_SIZE			\n"
-		"mov    QWORD PTR [rax + 0x18], rdx	# null->next				\n"
+		"mov    rcx, rbp			# calulate extent			\n"
+		"add    rcx, rsi			# add bytes				\n" 
+		"mov    QWORD PTR [rax + 0x18], rcx	# null->extent				\n"
+		"lea    rdx, [rbp + 0x28]		# + 5 * WORD_SIZE			\n"
+		"mov    QWORD PTR [rax + 0x20], rdx	# null->next				\n"
 
-		"mov    rdi, rbp			# null					\n"
-		"mov    rsi, 1									\n"
-		"call   allocate			# movabs? XXX				\n"
-
-		"shl    rbx, 16				# bytes << 8				\n"
-		"or     rbx, 0x04			# CELL_INTEGER				\n"
-		"mov    QWORD PTR [rax], rbx		# size->header				\n"
-
-		"mov    QWORD PTR [rbp + 0x08], rax	# null->size				\n"
 		"mov    rax, rbp			# null					\n"
 	  	);
 }
@@ -194,13 +190,13 @@ static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
 
-static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->size : null; }
+static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->zero : null; }
 
-static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
+static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->zero : null; }
 
-static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
+static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->zero : null; }
 
-static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->size : null; }
+static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->zero : null; }
 
 static cell * cons( cell * null, cell * a, cell * b )
 {
@@ -214,8 +210,8 @@ static cell * cons( cell * null, cell * a, cell * b )
 static cell * equals( cell * null, cell * a, cell * b )
 {
 	return ( ( is_tuple( null, a ) is_true ) || ( is_tuple( null, b ) is_true ) )
-		? ( a == b ) ? null->size : null
-		: ( a->header == b->header ) ? null->size : null;
+		? ( a == b ) ? null->zero : null
+		: ( a->header == b->header ) ? null->zero : null;
 }
 
 static cell * assq( cell * null, cell * key, cell * alist )

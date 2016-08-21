@@ -25,7 +25,7 @@ struct _cell
 	unsigned long header;
 	union
 	{
-		struct { cell * size; void * arena, * next; };
+		struct { cell * zero; void * arena, * extent, * next; };
 		struct { cell * car, * cdr; };
 	};
 };
@@ -44,6 +44,7 @@ static cell * allocate( cell * null, unsigned long words )
 {
 	cell * this = null->next;
 	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
+	if( null->next > null->extent ) quit( 2 );
 	return this;
 }
 
@@ -61,11 +62,9 @@ static cell * sire( unsigned long pages )
 	cell * null  = arena;				// build null by hand
 	null->header = CELL_NULL;
 	null->arena  = arena;
-	null->next   = arena + ( 4 * WORD_SIZE );
-
-	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
-	size->header = ( bytes << 16 ) + CELL_INTEGER;
-	null->size   = size;
+	null->extent = arena + bytes;
+	null->next   = arena + ( 5 * WORD_SIZE );
+	null->zero   = (cell *) CELL_INTEGER;		// a cell that is not null
 	return null;
 }
 
@@ -88,13 +87,13 @@ static cell * car( cell * null, cell * c ) { return c->car; }
 
 static cell * cdr( cell * null, cell * c ) { return c->cdr; }
 
-static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->size : null; }
+static cell * is_null( cell * null, cell * c )  { return ( cell_type( c ) == CELL_NULL )  ? null->zero : null; }
 
-static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->size : null; }
+static cell * is_tuple( cell * null, cell * c ) { return ( cell_type( c ) == CELL_TUPLE ) ? null->zero : null; }
 
-static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->size : null; }
+static cell * is_symbol( cell * null, cell * c )  { return ( cell_type( c ) == CELL_SYMBOL ) ? null->zero : null; }
 
-static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->size : null; }
+static cell * is_integer( cell * null, cell * c ) { return ( cell_type( c ) == CELL_INTEGER ) ? null->zero : null; }
 
 static cell * cons( cell * null, cell * a, cell * b )
 {
@@ -108,8 +107,8 @@ static cell * cons( cell * null, cell * a, cell * b )
 static cell * equals( cell * null, cell * a, cell * b )
 {
 	return ( ( is_tuple( null, a ) is_true ) || ( is_tuple( null, b ) is_true ) )
-		? ( a == b ) ? null->size : null
-		: ( a->header == b->header ) ? null->size : null;
+		? ( a == b ) ? null->zero : null
+		: ( a->header == b->header ) ? null->zero : null;
 }
 
 static cell * assq( cell * null, cell * key, cell * alist )
@@ -249,7 +248,7 @@ static cell * read_integer( cell * null )
 		}
 		else
 		{
-			quit( 3 );
+			quit( 4 );
 		}
 	}
 	c = c << 4;
@@ -306,12 +305,12 @@ static cell * read( cell * null )
 		}
 		else
 		{
-			quit( 3 );
+			quit( 4 );
 		}
 	}
 	if( ( c >= '0' ) && ( c <= '9' ) ) // 0 - 9 sans 0x prefix
 	{
-		quit( 3 );
+		quit( 4 );
 	}
 	if( c == '(' )
 	{
@@ -323,7 +322,7 @@ static cell * read( cell * null )
 	}
 	return symbol( null, c ); // may not be printable
 	
-	quit( 2 );
+	quit( 3 );
 	return null;
 }
 

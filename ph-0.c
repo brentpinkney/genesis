@@ -10,16 +10,13 @@
 #define WORD_SIZE		8
 #define CELL_NULL		0x01
 
-
-#define CELL_INTEGER		0x04
-
 typedef struct _cell cell;
 struct _cell
 {
 	unsigned long header;
 	union
 	{
-		struct { cell * size; void * arena, * next; };
+		struct { void * arena, * extent, * next; };
 	};
 };
 
@@ -30,6 +27,7 @@ static cell * allocate( cell * null, unsigned long words )
 {
 	cell * this = null->next;
 	null->next = ( (void *) null->next ) + ( words * WORD_SIZE );
+	if( null->next > null->extent ) quit( 2 );
 	printf( "words: %ld, cell: %p, next: %p\n", words, this, null->next );
 	return this;
 }
@@ -48,22 +46,18 @@ static cell * sire( unsigned long pages )
 	cell * null  = arena;				// build null by hand
 	null->header = CELL_NULL;
 	null->arena  = arena;
+	null->extent = arena + bytes;
 	null->next   = arena + ( 4 * WORD_SIZE );
 
-	cell * size  = allocate( null, 1 );		// make the size integer (useful as 'not null')
-	size->header = ( bytes << 16 ) + CELL_INTEGER;
-	null->size   = size;
-	printf( "size: 0x%02lx, %016lx\n", size->header >> 8, size->header );
-
-	printf( "null: %016lx, size: %016lx, arena: %016lx, next: %016lx\n",
-		null->header, null->size->header, (unsigned long) null->arena, (unsigned long) null->next );
+	printf( "null: %016lx, arena: %016lx, extent: %016lx, next: %016lx\n",
+		null->header, (unsigned long) null->arena, (unsigned long) null->extent, (unsigned long) null->next );
 
 	return null;
 }
 
 int main( )
 {
-	sire( NUM_PAGES );
-	quit( 0 );
+	cell * null = sire( NUM_PAGES );
+	cell * pair = allocate( null, 1 );
 	return 0;
 }
