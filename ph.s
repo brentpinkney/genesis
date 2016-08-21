@@ -7,8 +7,8 @@ halt:
 	ret
 
 integer_to_symbol:
-	mov	rbx, QWORD PTR [rsi + 0x02]
-	mov	rsi, rbx
+	mov	rcx, QWORD PTR [rsi + 0x02]
+	mov	rsi, rcx
 	movabs	r10, 0xf6 		# symbol()
 	call	r10
 	ret
