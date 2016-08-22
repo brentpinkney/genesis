@@ -57,7 +57,7 @@ static cell * allocate( cell * null, unsigned long words )
 	return this;
 }
 
-static cell * sire( unsigned long pages )
+static cell * heap( unsigned long pages )
 {
 	unsigned long bytes = PAGE_SIZE * pages;
 	void * arena = mmap(
@@ -581,7 +581,7 @@ static cell * repl( cell * null, cell * env )
 
 int main( )
 {
-	cell * null = sire( NUM_PAGES );
+	cell * null = heap( NUM_PAGES );
 	cell * env  = null;
 
 	repl( null, env );

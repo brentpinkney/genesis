@@ -80,7 +80,7 @@ static cell * allocate( cell * null, unsigned long words )
 	return this;
 }
 
-static cell * sire( unsigned long pages )
+static cell * heap( unsigned long pages )
 {
 	asm(	"mov    rbx, rdi			# save 'bytes' in rbx			\n"
 		"shl    rbx, 12				# * WORD_SIZE				\n"
@@ -819,7 +819,7 @@ static cell * repl( cell * null, cell * env )
 
 static int main( )
 {
-	cell * null = sire( NUM_PAGES );
+	cell * null = heap( NUM_PAGES );
 	cell * env  = null;
 
 	// functions…
@@ -856,7 +856,7 @@ static int main( )
 	env = cons( null, cons( null, symbol( null, 0xfa ), code( null, CELL_PROCEDURE, 0, get_char      , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf9 ), code( null, CELL_PROCEDURE, 1, put_char      , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf8 ), code( null, CELL_PROCEDURE, 2, allocate      , 0 ) ), env );
-	env = cons( null, cons( null, symbol( null, 0xf7 ), code( null, CELL_PROCEDURE, 0, sire          , 0 ) ), env );
+	env = cons( null, cons( null, symbol( null, 0xf7 ), code( null, CELL_PROCEDURE, 0, heap          , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf6 ), code( null, CELL_PROCEDURE, 2, symbol        , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf5 ), code( null, CELL_PROCEDURE, 2, integer       , 0 ) ), env );
 	env = cons( null, cons( null, symbol( null, 0xf4 ), code( null, CELL_PROCEDURE, 5, code          , 0 ) ), env );
